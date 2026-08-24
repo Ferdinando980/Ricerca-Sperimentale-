@@ -1,0 +1,34 @@
+id: book_wrong_comparison_operator_v2
+version: 2
+title: Finding wrong-comparison-operator bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-output
+- boundary-included-incorrectly
+capability_tags:
+- comparison-operator
+- boundary-condition
+resource_tags:
+- python
+pattern_id: wrong_comparison_operator
+canonical_problem_id: merge_intervals
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Adjacent items fail to merge/match (off-by-one boundary
+  error).
+
+  1. Identify all comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`).
+
+  2. Verify if the spec includes/excludes the equality case.
+
+  3. Manually trace the specific boundary input against the comparison.
+
+  4. Replace the operator (e.g., `<` to `<=`) rather than refactoring surrounding
+  logic.'
+derived_from: book_wrong_comparison_operator
+related_skills:
+- book_index_out_of_range_boundary_v2_v3

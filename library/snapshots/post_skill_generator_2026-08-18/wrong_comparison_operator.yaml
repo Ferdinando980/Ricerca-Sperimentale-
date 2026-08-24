@@ -1,0 +1,29 @@
+id: book_wrong_comparison_operator
+version: 1
+title: "Finding wrong-comparison-operator bugs"
+domain: programming
+problem_tags: [wrong-output, boundary-included-incorrectly]
+capability_tags: [comparison-operator, boundary-condition]
+resource_tags: [python]
+pattern_id: wrong_comparison_operator
+canonical_problem_id: merge_intervals
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types: [external]
+procedure_text: |
+  Symptom: a case that should be treated as "equal" or "touching" is treated as
+  "different", or vice versa -- often shows up as adjacent items that should merge
+  or match staying separate (or the reverse).
+  Procedure:
+  1. List every comparison in the function (`==`, `!=`, `<`, `<=`, `>`, `>=`).
+  2. For each, ask: does the spec include or exclude the equal case? (e.g. "merge
+     touching intervals" means `start == last_end` must be included, so the
+     comparison must be `<=`, not `<`.)
+  3. Write out the exact boundary input the spec describes and trace the
+     comparison by hand against it.
+  4. Swapping a single operator (`<` for `<=`, `==` for `!=`) is the fix in almost
+     every case -- resist the urge to restructure the surrounding logic.
+  Example (this Book's canonical case): interval merging used `start < last_end`
+  instead of `start <= last_end`, so two intervals that exactly touch (e.g.
+  `[1,4]` and `[4,5]`) were left unmerged.

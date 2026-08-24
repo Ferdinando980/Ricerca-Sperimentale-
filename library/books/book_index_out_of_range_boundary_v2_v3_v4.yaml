@@ -1,0 +1,38 @@
+id: book_index_out_of_range_boundary_v2_v3_v4
+version: 4
+title: Finding index/slice boundary bugs (compressed) (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-output-at-boundary
+- index-error-risk
+capability_tags:
+- index-boundary
+- slicing
+resource_tags:
+- python
+pattern_id: index_out_of_range_boundary
+canonical_problem_id: run_length_encode
+status: VERIFIED
+confidence: 1.0
+verification_count: 4
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+- self_compression_reverify
+procedure_text: 'Symptom: IndexError or missing first/last element due to len()-derived
+  index/slice bounds.
+
+
+  1. Audit all len()-derived indices/bounds (e.g., arr[len(x)], range(1, len(s)-1)).
+
+  2. Manually verify valid index range: max index is len-1, never len.
+
+  3. If IndexError: bound reaches len (should be len-1).
+
+  4. If missing edge: bound is off-by-one (starts at 1 or stops at len-1).
+
+  5. Verify using first/last-element test cases.'
+derived_from: book_index_out_of_range_boundary_v2_v3
+generation_method: compression

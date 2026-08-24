@@ -1,0 +1,30 @@
+id: book_wrong_comparison_operator_v2_v3_v4
+version: 4
+title: Finding wrong-comparison-operator bugs (compressed) (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-output
+- boundary-included-incorrectly
+capability_tags:
+- comparison-operator
+- boundary-condition
+resource_tags:
+- python
+pattern_id: wrong_comparison_operator
+canonical_problem_id: merge_intervals
+status: VERIFIED
+confidence: 1.0
+verification_count: 4
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+- self_compression_reverify
+procedure_text: "Symptom: Item on boundary/equal to neighbor takes wrong branch. \n\
+  \n1. Identify comparisons guarding branches (exclude loop ranges).\n2. Consult spec\
+  \ to determine if the equality case belongs in the current branch.\n3. If misclassified,\
+  \ flip operator: `<`↔`<=`, `>`↔`>=`, or `==`↔`!=`.\n4. Verify using input with adjacent\
+  \ equal values."
+derived_from: book_wrong_comparison_operator_v2_v3
+generation_method: compression

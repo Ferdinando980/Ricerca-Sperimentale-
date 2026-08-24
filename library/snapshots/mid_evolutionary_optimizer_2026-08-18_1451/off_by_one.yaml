@@ -1,0 +1,29 @@
+id: book_off_by_one
+version: 1
+title: "Finding off-by-one loop/range bugs"
+domain: programming
+problem_tags: [off-by-one, wrong-output, boundary-missed]
+capability_tags: [off-by-one, loop-bounds]
+resource_tags: [python]
+pattern_id: off_by_one
+canonical_problem_id: binary_search
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types: [external]
+procedure_text: |
+  Symptom: the function returns a wrong or missing result specifically at the FIRST
+  or LAST element of a sequence, while middle elements are handled correctly.
+  Procedure:
+  1. Find every loop bound and every `while` condition that compares two indices
+     or an index against a length (`range(n)`, `range(1, n)`, `lo <= hi`, `lo < hi`).
+  2. For each one, manually trace the smallest case that should still work (a
+     single-element or two-element input) and check whether the loop body actually
+     executes for the boundary element.
+  3. A `<=`/`<` swap, or a `range(n)` vs `range(n-1)`/`range(n+1)` swap, is almost
+     always the cause when the bug is isolated to one end of the sequence.
+  4. Fix by restoring the boundary-inclusive form the algorithm needs, then re-run
+     the test suite -- don't just patch the failing case, verify all tests pass.
+  Example (this Book's canonical case): a binary search whose `while lo <= hi`
+  loop condition was weakened to `while lo < hi`, causing it to miss a target that
+  sits exactly at `lo == hi`.

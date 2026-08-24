@@ -1,0 +1,34 @@
+id: book_integer_division_truncation_v2
+version: 2
+title: Finding / vs // division bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-numeric-output
+- type-error-on-index
+capability_tags:
+- integer-division
+- type-error
+resource_tags:
+- python
+pattern_id: integer_division_truncation
+canonical_problem_id: rolling_average
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Truncated integer results or "TypeError: list indices must
+  be integers" during division-based indexing.
+
+
+  1. Audit all `/` and `//` operators in the function.
+
+  2. For indexing/slicing (e.g., `arr[x]`, `range(x)`): Ensure `//` is used.
+
+  3. For ratios/averages: Ensure `/` is used.
+
+  4. Correct operators based on downstream use and re-run tests, verifying expected
+  numeric types.'
+derived_from: book_integer_division_truncation
+generation_method: compression

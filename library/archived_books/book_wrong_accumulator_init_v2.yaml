@@ -1,0 +1,27 @@
+id: book_wrong_accumulator_init_v2
+version: 2
+title: Finding wrong-accumulator-initialization bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-count
+- wrong-leading-element
+capability_tags:
+- accumulator-init
+- loop-state
+resource_tags:
+- python
+pattern_id: wrong_accumulator_init
+canonical_problem_id: count_vowels
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: "Symptom: Accumulation off by a constant (e.g., +1) or contains an\
+  \ extra initial element.\n\n1. Locate accumulator initialization (e.g., `count =\
+  \ 0`, `result = []`) before the loop.\n2. Verify initial value matches loop logic:\
+  \ counters should start at 0, lists at empty. \n3. Confirm by tracing the first\
+  \ iteration manually.\n4. Correct the initialization value; do not adjust loop logic."
+derived_from: book_wrong_accumulator_init
+generation_method: compression

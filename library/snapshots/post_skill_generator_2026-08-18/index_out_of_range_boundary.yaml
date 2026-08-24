@@ -1,0 +1,33 @@
+id: book_index_out_of_range_boundary
+version: 1
+title: Finding index/slice boundary bugs
+domain: programming
+problem_tags:
+- wrong-output-at-boundary
+- index-error-risk
+capability_tags:
+- index-boundary
+- slicing
+resource_tags:
+- python
+pattern_id: index_out_of_range_boundary
+canonical_problem_id: run_length_encode
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- external
+procedure_text: "Symptom: the last (or first) element of the input is silently dropped\
+  \ from the\noutput, or the function raises an IndexError on otherwise-valid input.\n\
+  Procedure:\n1. Find every place an index or slice bound is computed relative to\
+  \ `len(...)`\n   (`len(s) - 1`, `range(1, len(s))`, `hi = len(arr)`).\n2. Work out,\
+  \ for the smallest valid input, exactly which indices the algorithm\n   needs to\
+  \ visit -- including the very first and very last element -- and\n   compare that\
+  \ to what the current bound actually produces.\n3. A bound that is one element too\
+  \ conservative silently drops data at the\n   edge; a bound that is one element\
+  \ too generous risks indexing past the end.\n4. Fix the specific `-1`/`+1` (or missing\
+  \ one) so the boundary matches what the\n   algorithm needs, then re-run the tests\
+  \ including an edge-case input that\n   exercises just the first/last element.\n\
+  Example (this Book's canonical case): run-length encoding's loop range was\nnarrowed\
+  \ to `range(1, len(s) - 1)`, silently dropping the final run from the\noutput.\n"
+duplicate_of: null

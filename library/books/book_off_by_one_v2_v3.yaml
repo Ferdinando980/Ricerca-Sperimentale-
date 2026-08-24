@@ -1,0 +1,44 @@
+id: book_off_by_one_v2_v3
+version: 3
+title: Finding off-by-one loop/range bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- off-by-one
+- wrong-output
+- boundary-missed
+capability_tags:
+- off-by-one
+- loop-bounds
+resource_tags:
+- python
+pattern_id: off_by_one
+canonical_problem_id: binary_search
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+procedure_text: 'Symptom: the last valid iteration is skipped, or one extra unwanted
+  iteration runs -- the loop/range runs the WRONG NUMBER OF TIMES (a trip-count bug),
+  not a bad index value or a swapped operator.
+
+
+  1. Find the loop bound: `while cond` or `range(...)`.
+
+  2. Count by hand how many times it SHOULD run for a 1-2 element input, vs how many
+  times the code actually runs.
+
+  3. If short by one: loosen the bound (`<` -> `<=`, or drop a `-1` from a `range(n
+  - 1)`/add `+1`).
+
+  4. If one too many: tighten it the other way.
+
+  5. Verify against a minimal-length input specifically -- trip-count bugs often only
+  show up there, not on a full-length input.'
+derived_from: book_off_by_one_v2
+generation_method: compression
+related_skills:
+- book_index_out_of_range_boundary_v2_v3

@@ -1,0 +1,33 @@
+id: book_inverted_boolean_logic_v2_v3
+version: 3
+title: Finding inverted and/or boolean-logic bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- too-strict
+- too-permissive
+capability_tags:
+- boolean-logic
+- and-or-confusion
+resource_tags:
+- python
+pattern_id: inverted_boolean_logic
+canonical_problem_id: is_leap_year
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+procedure_text: 'Symptom: Boolean function too strict or permissive.
+
+  1. Restate spec as logic.
+
+  2. Compare logic structure term-by-term against code connectors.
+
+  3. Test edge cases from spec structure.
+
+  4. Correct misplaced connector; avoid compensating logic.'
+derived_from: book_inverted_boolean_logic_v2
+duplicate_of: null

@@ -1,0 +1,200 @@
+id: book_floating_point_equality_v4_v5
+version: 5
+title: Finding floating-point equality bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- flaky-numeric-comparison
+capability_tags:
+- floating-point
+- equality-check
+resource_tags:
+- python
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- manual_fix_2026-08-18
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-epsilon-guidance
+- manual_fix_2026-08-18-relative-epsilon-default
+- reverted_2026-08-18-relative-epsilon-attempt-failed
+- rewrite_2026-08-18-explicit-fallback-tiers
+- causal_ablation_2026-08-19
+procedure_text: "Symptom: Float comparisons (==, !=, in) fail due to precision.\n\n1. Replace equality/membership checks with tolerance logic:\n   - Single: abs(a - b) < epsilon\n   - Membership: any(abs(a - b) < epsilon for b in values)\n2. Choosing epsilon -- follow this order, do not skip straight to a guess:\n   a. An explicit tolerance/margin/percentage IS stated in the problem: use exactly that, scaled to the values involved (e.g. \"within 2% of budget b\" means epsilon = 0.02 * abs(b), not a fixed number).\n   b. No explicit tolerance, but a well-known, scale-independent domain convention applies. Currently known: money/currency amounts -- compare to the nearest cent, an ABSOLUTE tolerance of 0.01 in the currency's major unit, regardless of the amount's size (do NOT scale this by magnitude -- a 10 unit invoice and a 10000 unit invoice both need cent precision, not a percentage of the total).\n   c. Neither (a) nor (b) applies: do not invent a tolerance -- there is no reliable way\
+  \ to derive one from nothing, and a confident-looking number here is no more trustworthy than any other guess. Default to the same tiny epsilon as a pure identity (1e-9) rather than a real-world-scale guess, and add a one-line code comment stating this is a strict default because no tolerance or known convention was stated -- so a human reviewing the diff can widen it if they know better, instead of silently trusting an unverified number.\n3. Use any() over min()/max() to safely handle empty sequences.\n4. On failure: if a true case is wrongly rejected and you used (a) or (b), recheck the scaling/convention before touching anything else; if you used (c), that failure itself is evidence a convention DOES exist for this domain -- state what you now believe it is, do not just widen the number."
+derived_from: book_floating_point_equality_v4
+generation_method: compression
+
+# 2026-08-19 CAUSAL ABLATION (prompted by external review): moved from
+#   correlational evidence ("the same number shows up in different places")
+#   to causal evidence (manipulate the suspected cause directly, observe
+#   whether the effect follows). Two ablations run on the CLEANED skill
+#   (changelog stripped from procedure_text first -- see entry above --
+#   otherwise "0.01" mentioned repeatedly in narrative asides would have
+#   confounded the result):
+#
+#   Ablation 1 -- tier-b (currency, irrelevant to the tasks tested) varied
+#     across {0.01, 0.5, 0.003}, tier-c held fixed at 1e-9. Tested on
+#     sensor_readings_agree and same_destination (both non-currency, both
+#     should hit tier-c). Result: F's epsilon = 1e-9 in ALL 6 runs, completely
+#     unaffected by tier-b's number. No cross-tier leakage -- F is not
+#     pulling a number from an unrelated part of the instructions.
+#
+#   Ablation 2 -- tier-c's OWN fallback number varied across
+#     {1e-9, 2.5e-6, 7e-4}, tier-b held fixed at 0.01. Same two tasks.
+#     Result: F's epsilon tracked the manipulated number EXACTLY, every
+#     time, on both tasks (1e-9->1e-9, 2.5e-6->2.5e-6, 7e-4->7e-4).
+#
+#   CONCLUSION (now causally demonstrated, not just a well-supported
+#   hypothesis): for a no-hint task, F does not derive an epsilon from the
+#   task's own scale/content at all -- it reproduces whatever literal
+#   constant tier-c specifies, verbatim, regardless of whether that constant
+#   makes sense for the task (7e-4 is exactly as scale-inappropriate for
+#   km-distances as 1e-9 was). This is not cross-tier recitation (tier-b
+#   doesn't leak, ablation 1) -- it is direct, faithful, causally-proven
+#   instruction-following of tier-c specifically, with zero task-scale
+#   reasoning underneath it. Tier-c's fallback is doing exactly the causal
+#   work its wording claims, nothing more and nothing less: it is a literal
+#   substitution, not a judgment call the model is making.
+#
+#   What this does NOT claim: it is not a claim about internal mechanism
+#   (no access to weights/activations via the API) -- it is the strongest
+#   claim a black-box behavioral test can support: the best explanation that
+#   survived a direct attempt to falsify it via causal manipulation, on 2
+#   tasks x 2 ablations x 3 values = 12 real model calls, not an inference
+#   from passive observation.
+#
+# 2026-08-19 HIERARCHY REFINEMENT (prompted by external review, after the
+#   ablation above): decomposed "generalization" into recognition -> tier
+#   selection -> rule application -> autonomous parameter derivation.
+#   Staged probing on the unchanged skill: asked F to name the property that
+#   should determine epsilon (no value yet), then gave F that property's
+#   value directly and asked it to compute epsilon -- F ignored both and
+#   re-emitted tier-c's literal 1e-9 even with the grounding value handed to
+#   it in the same prompt. It does not spontaneously initiate derivation.
+#   But rewriting tier-c to REQUIRE deriving epsilon from a stated magnitude
+#   (instead of stating a constant) made F actually perform the derivation --
+#   correctly tracking magnitude across a ~1e7 range in two replications
+#   (200-300 units -> ~1e-4, one arithmetic slip; 0.001-0.005 units -> exactly
+#   5e-9, no slip). So: application is not the bottleneck -- F reliably does
+#   whatever tier-c's rule says, substitution or derivation alike -- the
+#   bottleneck is initiation: F will not invent an unrequested strategy, but
+#   executes a requested one reliably (if not perfectly precisely). Live
+#   tier-c still states a literal constant (1e-9), deliberately not switched
+#   to the tested qualitative-derivation wording yet -- that's a production
+#   decision, not just a research finding, left for a deliberate choice
+#   rather than folded in silently after two prior rewrite regressions this
+#   session. See experiment/canary.py and experiment/metrics.py for the full
+#   ablation and the two-shot magnitude-derivation test.
+#
+# 2026-08-19 DELEGATED-ARITHMETIC VALIDATION (prompted by external review,
+#   NOT YET LIVE -- procedure_text below is unchanged): the single arithmetic
+#   slip in the hierarchy-refinement test above (1e-4 instead of 2.5e-4) is a
+#   known LLM weakness -- silent token-by-token arithmetic done internally,
+#   not unreliable scale-tracking. Tested a rewording of tier-c that asks F
+#   to extract the stated magnitude into a named variable and write epsilon
+#   as an INTERPRETER-EVALUATED EXPRESSION (e.g. `epsilon = 1e-6 *
+#   typical_magnitude`) instead of hand-computing and hardcoding the final
+#   number -- same underlying rule, arithmetic delegated to the interpreter
+#   instead of the model. Validated on 7 real model calls across 5 tasks,
+#   not just the 2 examples that inspired the idea:
+#     - instrument_readings_match (200-300 units, reused): now produces
+#       `typical_magnitude = 250; epsilon = 1e-6 * typical_magnitude` --
+#       correct, no arithmetic left for the model to get wrong.
+#     - sensor_calibration_match (0.001-0.005 units, reused): `typical_
+#       magnitude = 0.003; epsilon = 1e-6 * typical_magnitude` -- correct
+#       (midpoint reading of the stated range, not the same reference point
+#       as the earlier hand-computed test, but the same order of magnitude).
+#     - shipment_weight_match (400-600 kg) -- a THIRD domain, never used to
+#       write the rule: `typical_magnitude = 500; epsilon = 1e-6 *
+#       typical_magnitude` -- correct on first try. Generalizes.
+#     - sensor_readings_agree (no magnitude at all, x2) and same_destination
+#       (no magnitude, x1): all 3 runs correctly fell back to the untouched
+#       literal 1e-9 default with the explanatory comment -- no hallucinated
+#       expression when there is nothing to derive from. Selectivity between
+#       "derive" and "no basis to derive, use the safe default" held 5/5
+#       across every no-magnitude vs has-magnitude task tested.
+#     - invoice_totals_match (currency, tier-b): unaffected, still 0.01, 1/1.
+#   CONCLUSION: the delegated-expression rewording clears the validation bar
+#   applied to everything else in this investigation (tested beyond the
+#   inspiring examples, checked for regressions on unrelated tiers, checked
+#   selectivity specifically). NOT adopted here as a live change -- whether
+#   to require scale-derivation in production (versus the current safe
+#   literal fallback) is a deliberate design decision, not a research
+#   finding, and this skill has already had two failed rewrite attempts
+#   reverted earlier in this same investigation. It also is not a free
+#   improvement: reasoning through a derivation costs more output tokens per
+#   call than blind literal substitution, trading part of F's cost advantage
+#   over Expert away in exchange for the added correctness -- see the
+#   token-accounting figures in experiment/metrics.py and the thesis chapter
+#   for the actual size of that tradeoff before deciding.
+#
+# 2026-08-19 CORRECTION to the "third domain" claim above (prompted by
+#   external review): "F generalizes correctly to shipment_weight_match, a
+#   domain never used to write the rule" was graded by checking whether F's
+#   output matched 1e-6 * stated_magnitude -- the SAME formula written into
+#   the rule, by the same investigator, in the same session. That is not
+#   independent validation that 1e-6*magnitude is the objectively correct
+#   real-world tolerance for this domain; it only shows F correctly applies
+#   an explicitly-given formula to new data (mechanically checkable by
+#   reading the code -- no arithmetic slip, correct extraction). Applied the
+#   same check that caught 3 of 4 CATEGORY_C domains as invalid earlier in
+#   this investigation: does unaided Expert (no skill, no formula, same bare
+#   buggy_source) independently converge near the same answer? Result: NO --
+#   3/3 reps, Expert reaches for `math.isclose(weight_a, weight_b)` (Python's
+#   default rel_tol=1e-9, abs_tol=0.0 -- essentially machine-precision
+#   equality), nothing resembling 1e-6*magnitude (~5e-4), and no real
+#   engagement with the stated "400-600 kg" range at all. shipment_weight_
+#   match does NOT pass canary validation -- it belongs with the other
+#   underdetermined no-hint domains, not as evidence that the derived value
+#   is objectively correct. Same caveat retroactively applies to the two
+#   ORIGINAL magnitude domains (instrument 200-300, sensor 0.001-0.005) used
+#   to build the rule -- their "correctness" was also graded against the
+#   rule's own formula, never independently canary-checked either. What
+#   survives, precisely: F reliably extracts a stated magnitude and applies
+#   an explicitly-given arithmetic rule to unseen data (rule-application
+#   fidelity, Category-A-like, verified by inspection). What does NOT
+#   survive: any claim that 1e-6*magnitude is a validated real-world
+#   convention -- it remains as author-chosen and unvalidated as any other
+#   constant flagged elsewhere in this investigation.
+#
+# 2026-08-19 SECOND VALIDATED CATEGORY_C DOMAIN, RESOLVED WITH F (prompted
+#   by external review; NOT YET LIVE -- procedure_text below is unchanged):
+#   significant-figures-implied precision (two values written with a
+#   different number of decimal digits, e.g. 13.7 vs 13.68 -- the digit
+#   count declares measurement precision, tolerance = 0.5*10^-d for the
+#   SMALLER decimal count d). Unlike shipment_weight_match, this domain WAS
+#   independently validated: unaided Expert converges on
+#   `round(x,1)==round(y,1)` 11/12 times across 3 deliberately non-textbook
+#   pairs, ruling out memorization of a stock physics example (novel pairs
+#   converged MORE consistently than the original textbook-looking 7.2 vs
+#   7.21, 92% vs 75%). Registered in experiment/canary.py's
+#   VALIDATED_C2_EXAMPLES with a real, checkable test_source.
+#
+#   F was then tested on TWO decimal structures at once (1v2 decimals, eps
+#   ~0.05; 2v3 decimals, eps ~0.005) crossed with skill condition:
+#     - BASELINE (sig-figs not in tier-b): fell to tier-c's 1e-9 (3/3 on the
+#       1v2 task) or misfired to currency's 0.01 by loose semantic
+#       association with "dial" (2/3 on the 2v3 task) -- neither correct.
+#     - RESEARCH VARIANT (sig-figs added as a 2nd tier-b convention, same
+#       load/splice/restore discipline as the delegated-arithmetic test):
+#       6/6 correct, AND -- the decisive part -- the two tasks produced
+#       DIFFERENT epsilon values (0.05 vs 0.005), each correctly scaled to
+#       that task's OWN decimal structure, reasoning shown in the comment.
+#   A single memorized-constant-substitution mechanism cannot produce two
+#   different, each-independently-correct numbers across two different
+#   tasks -- this is the first clean resolution in this whole investigation
+#   of recitation-vs-derivation on a domain confirmed NOT to be a
+#   lucky-scale coincidence (currency's 0.01 was never tested against a
+#   no-hint case requiring a different order of magnitude, so it could
+#   never rule this out). NOT adopted as live procedure_text -- same
+#   deliberate-deployment principle as the delegated-arithmetic result:
+#   a validated research finding, not yet a production decision. See
+#   experiment/canary.py FOLLOW-UPS 1-4 for the full elimination of
+#   confounds (asymmetry vs raw numeric distance, memorization risk) that
+#   preceded this result.

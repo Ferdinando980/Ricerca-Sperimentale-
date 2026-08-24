@@ -1,0 +1,51 @@
+id: book_wrong_string_case_comparison
+version: 1
+title: Fixing wrong string case comparison bugs
+domain: programming
+problem_tags:
+- wrong-output
+- runtime-bug
+capability_tags:
+- case-sensitivity
+- string-comparison
+resource_tags:
+- python
+pattern_id: wrong_string_case_comparison
+canonical_problem_id: find_matching_tag
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- skill_generator_initial_verification
+procedure_text: 'Symptom: String equality (`==`, `!=`), search, or membership tests
+  (`in`) fail to match semantically equivalent values when inputs, identifiers, tags,
+  file extensions, or query terms differ only by character casing (e.g., `"Tag"` vs
+  `"tag"`).
+
+
+  Procedure:
+
+  1. Identify direct string comparisons (`==`, `!=`) or lookups (`in`) where the domain
+  logic requires case-insensitive matching (e.g., search queries, tags, header names,
+  command names).
+
+  2. Normalize the comparison query outside of loops or repeated checks using `.lower()`
+  (or `.casefold()` for full Unicode case-folding) and store it in a temporary variable
+  to avoid redundant method calls.
+
+  3. Apply the identical normalization method (`.lower()` or `.casefold()`) to the
+  target string or iterable element at the comparison site.
+
+  4. When performing collection containment checks (e.g., `query in items`), transform
+  collection elements with `[x.lower() for x in items]` or build a mapping of `{x.lower():
+  x for x in items}` if original values must be retrieved.
+
+  5. Verify that the function returns or preserves the original, un-normalized string
+  value (e.g., returning `tag` rather than `tag.lower()`) unless explicit normalization
+  of the output is required.
+
+
+  Example: In `find_matching_tag(tags, query)`, pre-calculating `query_lower = query.lower()`
+  and evaluating `if tag.lower() == query_lower:` allows case-insensitive matches
+  while still returning the original `tag`.'
+generation_method: skill_generator

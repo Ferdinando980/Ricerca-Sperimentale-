@@ -1,0 +1,36 @@
+id: book_off_by_one_v2_v3_v4
+version: 4
+title: Finding off-by-one loop/range bugs (compressed) (compressed) (compressed)
+domain: programming
+problem_tags:
+- off-by-one
+- wrong-output
+- boundary-missed
+capability_tags:
+- off-by-one
+- loop-bounds
+resource_tags:
+- python
+pattern_id: off_by_one
+canonical_problem_id: binary_search
+status: VERIFIED
+confidence: 1.0
+verification_count: 4
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+- self_compression_reverify
+procedure_text: 'Symptom: Wrong iteration count (loop runs too few/many times).
+
+
+  1. Compare actual vs. expected iterations for 1-2 element inputs.
+
+  2. Short by one: Loosen bound (e.g., `<` to `<=`, add `+1`).
+
+  3. One too many: Tighten bound.
+
+  4. Verify with minimal input.'
+derived_from: book_off_by_one_v2_v3
+generation_method: compression

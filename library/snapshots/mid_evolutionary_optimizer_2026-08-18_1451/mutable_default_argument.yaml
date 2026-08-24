@@ -1,0 +1,30 @@
+id: book_mutable_default_argument
+version: 1
+title: "Finding mutable-default-argument bugs"
+domain: programming
+problem_tags: [state-leaks-across-calls, wrong-output-on-repeat-call]
+capability_tags: [mutable-default-argument, python-gotcha]
+resource_tags: [python]
+pattern_id: mutable_default_argument
+canonical_problem_id: dedupe_preserve_order
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types: [external]
+procedure_text: |
+  Symptom: the function gives the right answer the first time it's called in a
+  process, but wrong (usually larger or contaminated) results on later calls with
+  fresh inputs, even though nothing global was touched.
+  Procedure:
+  1. Check the function signature for a default argument that is a list, dict, or
+     set literal (`def f(x, acc=[])`, `def f(x, seen={})`).
+  2. In Python, that default object is created ONCE when the function is defined,
+     not once per call -- every call that doesn't pass its own value shares and
+     mutates the same object.
+  3. Fix by using `None` as the default and creating a fresh container inside the
+     function body: `def f(x, acc=None): acc = [] if acc is None else acc`.
+  4. Re-run the test suite calling the function multiple times in one process to
+     confirm the state no longer leaks.
+  Example (this Book's canonical case): `dedupe_preserve_order(items, seen=set(),
+  result=[])` accumulated `seen`/`result` across every call instead of starting
+  fresh each time.

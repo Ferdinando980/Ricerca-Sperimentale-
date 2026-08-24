@@ -1,0 +1,27 @@
+id: book_key_error_missing_dict_check_v2
+version: 2
+title: Fixing key error missing dict check bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-output
+- runtime-bug
+capability_tags:
+- missing-key-check
+- dict-access
+resource_tags:
+- python
+pattern_id: key_error_missing_dict_check
+canonical_problem_id: count_word_frequency
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- skill_generator_initial_verification
+- self_compression_reverify
+procedure_text: "Symptom: KeyError during dictionary augmented assignment (e.g., `d[k]\
+  \ += v` or `d[k].append(v)`) on uninitialized keys.\n\n1. Identify unsafe read-mutate\
+  \ patterns.\n2. Determine default value (e.g., 0, [], \"\").\n3. Apply fixes:\n\
+  \   - Scalar: `d[k] = d.get(k, default) + v`\n   - Collections: `d.setdefault(k,\
+  \ []).append(v)`\n   - Alternative: Use `collections.defaultdict`."
+derived_from: book_key_error_missing_dict_check
+generation_method: compression

@@ -1,0 +1,34 @@
+id: book_wrong_accumulator_init
+version: 1
+title: Finding wrong-accumulator-initialization bugs
+domain: programming
+problem_tags:
+- wrong-count
+- wrong-leading-element
+capability_tags:
+- accumulator-init
+- loop-state
+resource_tags:
+- python
+pattern_id: wrong_accumulator_init
+canonical_problem_id: count_vowels
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- external
+procedure_text: "Symptom: every result from a loop-based accumulation is off by a\
+  \ constant\namount (e.g. always one too high), or has an extra/spurious element\
+  \ at the\nstart that shouldn't be there.\nProcedure:\n1. Find the accumulator's\
+  \ initialization line, right before the loop that\n   builds it up (`count = 0`,\
+  \ `result = []`, `total = 0`).\n2. Check the initial value's type and value against\
+  \ what the loop body actually\n   does to it: a counter incremented once per match\
+  \ should start at 0, not 1;\n   a list built with `.append()` should start as `[]`,\
+  \ not `[something]`.\n3. A constant offset in every output (always +1, or always\
+  \ one extra leading\n   item) is the signature of this bug -- trace a small input\
+  \ by hand from the\n   very first loop iteration to confirm.\n4. Fix by correcting\
+  \ the initial value to match what the loop's own logic\n   assumes, not by adjusting\
+  \ the loop body to compensate.\nExample (this Book's canonical case): a vowel counter\
+  \ was initialized to\n`count = 1` instead of `count = 0`, so every count came out\
+  \ exactly one too\nhigh.\n"
+duplicate_of: null

@@ -1,0 +1,31 @@
+id: book_floating_point_equality_v2
+version: 2
+title: Finding floating-point equality bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- flaky-numeric-comparison
+capability_tags:
+- floating-point
+- equality-check
+resource_tags:
+- python
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Computed float comparison or membership check (`x in list_of_floats`)
+  fails due to precision mismatch.
+
+  Procedure:
+
+  1. Locate exact comparisons (`==`, `!=`, `in`) on arithmetic-derived floats.
+
+  2. Replace with tolerance checks: `abs(a - b) < epsilon` or `any(abs(a - b) < epsilon
+  for b in values)`, using a domain-appropriate epsilon (e.g., 1e-9).
+
+  3. Re-run tests; adjust epsilon if needed instead of reverting to exact comparison.'

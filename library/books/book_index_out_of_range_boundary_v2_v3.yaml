@@ -1,0 +1,44 @@
+id: book_index_out_of_range_boundary_v2_v3
+version: 3
+title: Finding index/slice boundary bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-output-at-boundary
+- index-error-risk
+capability_tags:
+- index-boundary
+- slicing
+resource_tags:
+- python
+pattern_id: index_out_of_range_boundary
+canonical_problem_id: run_length_encode
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+procedure_text: 'Symptom: either an IndexError, or the first/last element silently
+  missing from the result -- a specific INDEX or SLICE BOUND derived from len(...)
+  points one past (or one short of) where it should. Not a loop trip-count bug (the
+  loop can run the right number of times and still index wrong) and not a swapped
+  operator.
+
+
+  1. Find every len(...)-derived index or slice bound (e.g. `arr[len(x)]`, `range(1,
+  len(s) - 1)`, `hi = len(arr)`).
+
+  2. Compute by hand the valid index range for a small example -- the max valid index
+  is len-1, never len.
+
+  3. If it raises: the bound reaches len instead of stopping at len-1.
+
+  4. If an edge element vanishes: the bound stops at len-1 instead of len, or starts
+  at 1 instead of 0.
+
+  5. Re-test with first/last-element cases specifically, not just a full run.'
+derived_from: book_index_out_of_range_boundary_v2
+related_skills:
+- book_off_by_one_v2_v3

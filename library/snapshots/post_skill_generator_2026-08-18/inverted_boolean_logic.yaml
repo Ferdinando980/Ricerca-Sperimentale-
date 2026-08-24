@@ -1,0 +1,35 @@
+id: book_inverted_boolean_logic
+version: 1
+title: Finding inverted and/or boolean-logic bugs
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- too-strict
+- too-permissive
+capability_tags:
+- boolean-logic
+- and-or-confusion
+resource_tags:
+- python
+pattern_id: inverted_boolean_logic
+canonical_problem_id: is_leap_year
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- external
+procedure_text: "Symptom: a boolean-returning function is either far too strict (almost\
+  \ always\nreturns False) or far too permissive (almost always returns True) compared\
+  \ to\nthe spec.\nProcedure:\n1. Restate the spec in plain English as a conjunction/disjunction\
+  \ of conditions\n   (\"valid if A and B and C\", or \"leap year if (div-by-4 and\
+  \ not div-by-100) or\n   div-by-400\").\n2. Compare that plain-English structure,\
+  \ term by term and connective by\n   connective, against the code's actual `and`/`or`\
+  \ placement -- a single\n   swapped connective changes the truth table completely.\n\
+  3. Test against the specific edge cases the spec structure implies (e.g. for\n \
+  \  leap years: a century year divisible by 400 vs one that isn't).\n4. Fix by restoring\
+  \ the connective the spec requires; don't add extra\n   conditions to compensate\
+  \ -- that usually masks the bug instead of fixing it.\nExample (this Book's canonical\
+  \ case): leap-year logic had its outer `or`\nchanged to `and`, so a year had to\
+  \ satisfy both halves of the rule\nsimultaneously -- which is never possible, so\
+  \ the function always returned\nFalse.\n"
+duplicate_of: null

@@ -1,0 +1,30 @@
+id: book_integer_division_truncation_v2
+version: 2
+title: Finding / vs // division bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-numeric-output
+- type-error-on-index
+capability_tags:
+- integer-division
+- type-error
+resource_tags:
+- python
+pattern_id: integer_division_truncation
+canonical_problem_id: rolling_average
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Truncated integers where fractions expected or TypeError
+  (index/range).
+
+  1. Identify all `/` and `//` operators.
+
+  2. If result is used for indexing/slicing, use `//` (integer division).
+
+  3. If result is a ratio/average, use `/` (true division).
+
+  4. Update operator to match downstream requirements and verify test outputs.'

@@ -1,0 +1,32 @@
+id: book_index_out_of_range_boundary_v2
+version: 2
+title: Finding index/slice boundary bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-output-at-boundary
+- index-error-risk
+capability_tags:
+- index-boundary
+- slicing
+resource_tags:
+- python
+pattern_id: index_out_of_range_boundary
+canonical_problem_id: run_length_encode
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Missing first/last element or IndexError on valid input.
+
+
+  1. Locate all index/slice bounds relative to len().
+
+  2. Verify boundary needs for minimum input versus current range.
+
+  3. Adjust +/-1 offsets to include required elements.
+
+  4. Validate with edge-case tests covering first/last elements.'
+derived_from: book_index_out_of_range_boundary
+generation_method: compression

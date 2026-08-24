@@ -1,0 +1,31 @@
+generated_at: '2026-08-18T20:46:04.403551+00:00'
+n_pairs: 4
+pairs:
+- book_a: book_index_out_of_range_boundary_v2_v3
+  book_b: book_off_by_one_v2_v3
+  pattern_a: index_out_of_range_boundary
+  pattern_b: off_by_one
+  label: RELATED
+  reasoning: Book A addresses index-access calculation errors, while Book B addresses
+    loop iteration trip-count errors.
+- book_a: book_index_out_of_range_boundary_v2_v3
+  book_b: book_wrong_comparison_operator_v2_v3
+  pattern_a: index_out_of_range_boundary
+  pattern_b: wrong_comparison_operator
+  label: DISTINCT
+  reasoning: Book A addresses index arithmetic errors in bounds, whereas Book B focuses
+    solely on logical comparison operators in conditional branches.
+- book_a: book_off_by_one_v2_v3
+  book_b: book_wrong_comparison_operator_v2_v3
+  pattern_a: off_by_one
+  pattern_b: wrong_comparison_operator
+  label: DISTINCT
+  reasoning: 'The books address different logical errors: one corrects iteration counts
+    in loops, while the other corrects edge-case branch conditions.'
+- book_a: book_floating_point_equality_v4_v5
+  book_b: book_integer_division_truncation_v2_v3_v4
+  pattern_a: floating_point_equality
+  pattern_b: integer_division_truncation
+  label: DISTINCT
+  reasoning: 'These address entirely different root causes: floating-point precision
+    errors versus integer truncation/type errors.'

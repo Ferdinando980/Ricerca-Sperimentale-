@@ -1,0 +1,267 @@
+"""Generates the "Epsilon Lab": a self-contained HTML page, same RPG pixel
+visual language as city/report.py, visualizing the floating_point_equality
+causal-ablation investigation (see experiment/canary.py) instead of a run's
+event log. Every number/code snippet below is a REAL recorded output from a
+real model call made during that investigation (conversation 2026-08-19) --
+transcribed by hand from the terminal output at the time, not simulated or
+re-generated on the fly. This file is NOT tied to an experiment_id (the
+investigation isn't) and does not auto-regenerate from logs the way
+city/report.py does -- if the ablation is ever re-run for real, update
+QA_ITEMS below to match.
+
+Design: a flat list of plain-language questions, click to reveal the actual
+recorded answer -- no multi-step selector/dial/cast-button flow (simplified
+2026-08-19 per direct feedback that the earlier interactive-lab version was
+too complex).
+
+Run: python -m cognitive_rpg.city.epsilon_lab
+Writes logs/epsilon_lab.html
+"""
+
+import json
+from pathlib import Path
+
+from .. import config
+
+# --- real recorded data, conversation 2026-08-19 -----------------------
+# Each item: a plain-language question, which rule-tier answers it, the
+# real code F produced, and a one-line verdict. group = section heading.
+QA_ITEMS = [
+    {
+        "group": "Nessun indizio: cosa fa F da solo?",
+        "q": "F vede due letture di sensori. Il problema non dice nulla su quale tolleranza usare. Cosa risponde?",
+        "tier": "c", "epsilon": "1e-9",
+        "code": "def sensor_readings_agree(reading_a, reading_b):\n    return abs(reading_a - reading_b) < 1e-9",
+        "verdict": "Usa il default prudente dello skill (livello C) -- lo stesso di un confronto esatto.",
+    },
+    {
+        "group": "Nessun indizio: cosa fa F da solo?",
+        "q": "Stessa situazione, ma con due distanze in chilometri invece che letture di sensori. Cambia risposta?",
+        "tier": "c", "epsilon": "1e-9",
+        "code": "def same_destination(distance_km, target_km):\n    return abs(distance_km - target_km) < 1e-9",
+        "verdict": "No -- identica. Non deriva nulla dal fatto che qui si parla di chilometri.",
+    },
+    {
+        "group": "Nessun indizio: cosa fa F da solo?",
+        "q": "E con due importi in valuta? Nessun numero dichiarato, ma esiste una convenzione nota (si arrotonda al centesimo).",
+        "tier": "b", "epsilon": "0.01",
+        "code": "def invoice_totals_match(computed_amount, invoice_amount):\n    return abs(computed_amount - invoice_amount) <= 0.01",
+        "verdict": "Qui sceglie il livello B, non C -- riconosce la convenzione sui soldi.",
+    },
+    {
+        "group": "Manipoliamo noi la regola: F la segue davvero, o recita un esempio?",
+        "q": "Cambiamo il valore di riserva dello skill (livello C) da 1e-9 a 2,5e-6, sullo stesso caso dei sensori. F cambia risposta di conseguenza?",
+        "tier": "c", "epsilon": "2.5e-6",
+        "code": "def sensor_readings_agree(reading_a, reading_b):\n    return abs(reading_a - reading_b) < 2.5e-6",
+        "verdict": "Sì, esattamente il valore che abbiamo impostato noi -- lo segue alla lettera.",
+    },
+    {
+        "group": "Manipoliamo noi la regola: F la segue davvero, o recita un esempio?",
+        "q": "E se lo impostiamo a 7e-4, un valore assurdo per una distanza in km?",
+        "tier": "c", "epsilon": "7e-4",
+        "code": "def same_destination(distance_km, target_km):\n    return abs(distance_km - target_km) < 7e-4",
+        "verdict": "Lo segue comunque -- anche se è la scelta sbagliata per questo caso. Sostituzione, non ragionamento sulla scala.",
+    },
+    {
+        "group": "Manipoliamo noi la regola: F la segue davvero, o recita un esempio?",
+        "q": "Cambiamo di nuovo il livello C, ma stavolta chiediamo a F il compito sulla valuta -- dove il livello C non si applica. F si confonde e usa comunque il numero che abbiamo cambiato?",
+        "tier": "b", "epsilon": "0.01",
+        "code": "def invoice_totals_match(computed_amount, invoice_amount):\n    return abs(computed_amount - invoice_amount) < 0.01",
+        "verdict": "No -- resta 0,01 in ogni caso. F sceglie il livello giusto prima di sostituirne il contenuto.",
+    },
+    {
+        "group": "Se alla regola chiediamo di calcolare, non solo sostituire",
+        "q": "Riscriviamo il livello C: invece di dare un numero fisso, chiediamo di leggere una grandezza dal problema e calcolare la tolleranza da lì. Su uno strumento con letture tipicamente 200-300 unità, cosa fa F?",
+        "tier": "c*", "epsilon": "1e-4 (formula)",
+        "code": "def instrument_readings_match(reading_a, reading_b):\n    typical_magnitude = 250\n    epsilon = 1e-6 * typical_magnitude  # F ha scritto 1e-4 a mano qui: piccolo errore di conto\n    return abs(reading_a - reading_b) < epsilon",
+        "verdict": "Trova la grandezza e tenta il calcolo -- ma sbagliando di poco il conto a mente (1e-4 invece di 2,5e-4).",
+    },
+    {
+        "group": "Se alla regola chiediamo di calcolare, non solo sostituire",
+        "q": "Stessa richiesta, ma su una scala mille volte più piccola (0,001-0,005 unità). Il calcolo regge anche qui?",
+        "tier": "c*", "epsilon": "5e-9 (esatto)",
+        "code": "def sensor_calibration_match(reading_a, reading_b):\n    return abs(reading_a - reading_b) < 5e-9  # 1e-6 di 0.005",
+        "verdict": "Sì, stavolta esatto -- il conto a mente questa volta è andato bene.",
+    },
+    {
+        "group": "Se alla regola chiediamo di calcolare, non solo sostituire",
+        "q": "Se invece chiediamo a F di scrivere il CALCOLO come formula nel codice (lascia fare i conti all'interprete, non a se stesso), l'errore aritmetico sparisce?",
+        "tier": "c*", "epsilon": "1e-6 * typical_magnitude",
+        "code": "def instrument_readings_match(reading_a, reading_b):\n    typical_magnitude = 250\n    epsilon = 1e-6 * typical_magnitude\n    return abs(reading_a - reading_b) < epsilon",
+        "verdict": "Sì -- zero aritmetica a mano, zero errore. Ma vedi la domanda successiva prima di fidarti.",
+    },
+    {
+        "group": "Attenzione: questo non prova che 1e-6 sia \"il numero giusto\"",
+        "q": "Quella stessa formula-invece-di-numero, provata su un terzo caso mai visto prima (pesi di spedizione, 400-600 kg) -- generalizza?",
+        "tier": "c*", "epsilon": "5e-4 (formula)",
+        "code": "def shipment_weight_match(weight_a, weight_b):\n    typical_magnitude = 500\n    epsilon = 1e-6 * typical_magnitude\n    return abs(weight_a - weight_b) < epsilon",
+        "verdict": "F applica la formula correttamente anche qui -- ma questo prova solo che sa eseguire la formula, non che la formula sia quella giusta (vedi sotto).",
+    },
+    {
+        "group": "Attenzione: questo non prova che 1e-6 sia \"il numero giusto\"",
+        "q": "Controllo decisivo: l'IA più brava, senza alcuno skill né formula, arriva da sola a un numero simile per lo stesso caso dei pesi di spedizione?",
+        "tier": "controllo", "epsilon": "isclose() (~1e-9 relativo)",
+        "code": "def shipment_weight_match(weight_a, weight_b):\n    return math.isclose(weight_a, weight_b)  # nessun legame con \"400-600 kg\"",
+        "verdict": "No -- propone tutt'altro, 3 volte su 3. La formula 1e-6 non è una convenzione validata: è arbitraria quanto qualunque altro numero, tranne quello sulla valuta.",
+    },
+    {
+        "group": "Il secondo dominio: cifre significative -- la risposta decisiva",
+        "q": "Trovato un dominio diverso: la precisione dichiarata dalle cifre decimali scritte (12,3 vs 12,30). Prima di fidarsi: l'IA brava, senza aiuto, converge sulla stessa regola con coppie NON da manuale (13.7/13.68, non 7.2/7.21 da libro di testo)?",
+        "tier": "controllo", "epsilon": "round(x,1)==round(y,1)",
+        "code": "def component_reading_matches(a, b):\n    return round(a, 1) == round(b, 1)  # 11/12 su coppie mai viste, meglio della coppia da manuale (3/4)",
+        "verdict": "Sì, e meglio della coppia da manuale -- esclude la memorizzazione: se fosse un ricordo di training, le coppie insolite dovevano andare peggio, non meglio.",
+    },
+    {
+        "group": "Il secondo dominio: cifre significative -- la risposta decisiva",
+        "q": "Con lo skill live (le cifre significative non sono una convenzione nota), F risolve questo dominio da solo?",
+        "tier": "c", "epsilon": "1e-9 o 0.01 (sbagliato)",
+        "code": "def dial2_reading_matches(a, b):\n    return abs(a - b) <= 0.01  # aggancio errato alla valuta, per associazione con \"dial\"",
+        "verdict": "No -- cade sul default, o si aggancia per errore alla valuta. Nessuna delle due è corretta.",
+    },
+    {
+        "group": "Il secondo dominio: cifre significative -- la risposta decisiva",
+        "q": "Aggiungiamo le cifre significative come convenzione nota (solo per l'esperimento). Su DUE casi diversi nello stesso giro (1 vs 2 decimali, 2 vs 3 decimali) -- F copia lo stesso numero o ne produce due diversi, ciascuno giusto?",
+        "tier": "b*", "epsilon": "0,05 e 0,005 (due numeri diversi)",
+        "code": "component_reading_matches: epsilon = 0.05  # d=1\ndial2_reading_matches:     epsilon = 0.005  # d=2\n(6/6 corrette, ragionamento scritto nel commento)",
+        "verdict": "Due numeri diversi, ciascuno corretto per il proprio caso -- una copia non può farlo. È la prima prova pulita di derivazione vera in questo capitolo su un dominio senza sospetto di coincidenza.",
+    },
+    {
+        "group": "F si ferma da solo, o va spinto ad ogni passo?",
+        "q": "Prima di scrivere codice, chiediamo a F: quale proprietà del problema dovrebbe determinare la tolleranza? (nessun calcolo ancora)",
+        "tier": "-", "epsilon": "1e-9 comunque",
+        "code": "\"La proprietà è che non viene fornita alcuna tolleranza esplicita... richiede un epsilon di default.\" (e scrive comunque il codice completo, non richiesto)",
+        "verdict": "Ignora la domanda sulla proprietà -- salta dritto al default.",
+    },
+    {
+        "group": "F si ferma da solo, o va spinto ad ogni passo?",
+        "q": "Gli diamo anche il valore da cui partire (\"la grandezza tipica è circa 245\") nello stesso messaggio. Cambia qualcosa?",
+        "tier": "-", "epsilon": "1e-9 comunque",
+        "code": "\"1e-9; poiché non è fornita alcuna tolleranza esplicita o convenzione standard...\"",
+        "verdict": "No -- ignora anche il valore consegnato direttamente in mano.",
+    },
+    {
+        "group": "F si ferma da solo, o va spinto ad ogni passo?",
+        "q": "Gli diamo infine il compito vero, senza altre informazioni extra. Differenza rispetto a prima?",
+        "tier": "-", "epsilon": "1e-9",
+        "code": "return abs(reading_a - reading_b) < 1e-9",
+        "verdict": "Nessuna -- identico ai due passi precedenti. Non parte mai da solo; esegue solo se la regola glielo chiede esplicitamente.",
+    },
+]
+
+TIER_LABEL = {
+    "a": "Livello A", "b": "Livello B", "c": "Livello C",
+    "c*": "Livello C (riscritto per l'esperimento)",
+    "controllo": "Controllo indipendente", "-": "Fuori skill (domanda diretta)",
+}
+
+
+def generate() -> Path:
+    data = {"items": QA_ITEMS, "tier_label": TIER_LABEL}
+    html = _TEMPLATE.replace("__LAB_DATA__", json.dumps(data).replace("</", "<\\/"))
+    out_path = config.LOG_DIR / "epsilon_lab.html"
+    out_path.write_text(html, encoding="utf-8")
+    return out_path
+
+
+_TEMPLATE = r"""<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Epsilon Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c1524; --panel: #16243a; --panel-edge: #4f9fd6; --panel-shadow: #060a12;
+    --ink: #f2ead2; --muted: #8fa4bf; --line: #2b4160;
+    --accent: #e8c15a; --bad: #ef6f63; --good: #6fd19e; --warn: #e89f4f;
+    --font-pixel: "Press Start 2P", ui-monospace, monospace;
+    --font-retro: "VT323", ui-monospace, monospace;
+    --font-data: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background: repeating-linear-gradient(45deg, #101d31 0 16px, #0e1a2c 16px 32px);
+    color:var(--ink); font-family:var(--font-retro); font-size:19px; }
+  header { padding:22px 24px 18px; border-bottom:4px solid var(--panel-edge);
+    background:linear-gradient(180deg, #142238, #0c1524); }
+  h1 { margin:0 0 8px; font-family:var(--font-pixel); font-size:19px; letter-spacing:1px;
+    color:var(--accent); text-shadow:2px 2px 0 var(--panel-shadow); }
+  .sub { color:var(--muted); font-size:16px; max-width:74ch; }
+  main { padding:22px 24px 48px; max-width:920px; margin:0 auto; }
+  .group-title { font-family:var(--font-pixel); font-size:11px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--accent); margin:30px 0 12px; line-height:1.6; }
+  .group-title:first-child { margin-top:0; }
+  .item { background:var(--panel); border:2px solid var(--line); margin-bottom:10px;
+    box-shadow: 0 3px 0 var(--panel-shadow); }
+  .item.open { border-color:var(--panel-edge); }
+  .item-head { display:flex; align-items:center; gap:12px; padding:13px 16px; cursor:pointer; user-select:none; }
+  .item-head .icon { font-size:22px; flex-shrink:0; }
+  .item-head .q { flex:1; font-size:17px; line-height:1.4; }
+  .item-head .chev { color:var(--muted); font-family:var(--font-pixel); font-size:10px; transition:transform .15s; flex-shrink:0; }
+  .item.open .chev { transform:rotate(90deg); color:var(--accent); }
+  .item-body { max-height:0; overflow:hidden; transition:max-height .2s ease; }
+  .item.open .item-body { max-height:400px; }
+  .item-body-inner { padding:0 16px 16px 50px; display:flex; flex-direction:column; gap:10px; }
+  .badge-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .badge { font-family:var(--font-pixel); font-size:9px; padding:5px 8px; border:1px solid var(--line);
+    color:var(--muted); text-transform:uppercase; }
+  .epsilon-badge { font-family:var(--font-pixel); font-size:12px; color:var(--accent); padding:6px 10px;
+    border:1px solid var(--accent); text-shadow:0 0 6px rgba(232,193,90,.5); }
+  .code-card { background:var(--ink); color:#1c1b18; border:2px solid var(--panel-shadow);
+    padding:10px 12px; font-family:var(--font-data); font-size:12.5px; white-space:pre-wrap;
+    box-shadow:0 3px 0 rgba(0,0,0,.3); }
+  .verdict { font-size:15px; line-height:1.5; color:var(--ink); }
+  .verdict.warn-tone { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128302; Epsilon Lab</h1>
+  <div class="sub">L'indagine su come F sceglie una tolleranza quando il problema non gliela dice -- in domande semplici. Clicca per vedere cosa ha risposto davvero (conversazione 2026-08-19, vedi <code>experiment/canary.py</code> per il testo completo).</div>
+</header>
+<main id="list"></main>
+
+<script>
+const DATA = __LAB_DATA__;
+const list = document.getElementById('list');
+let lastGroup = null;
+DATA.items.forEach((item, i) => {
+  if (item.group !== lastGroup) {
+    const h = document.createElement('div');
+    h.className = 'group-title';
+    h.textContent = item.group;
+    list.appendChild(h);
+    lastGroup = item.group;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'item';
+  const isWarn = item.group.startsWith('Attenzione');
+  wrap.innerHTML = `
+    <div class="item-head">
+      <span class="icon">&#129497;</span>
+      <span class="q">${item.q}</span>
+      <span class="chev">&#9654;</span>
+    </div>
+    <div class="item-body"><div class="item-body-inner">
+      <div class="badge-row">
+        <span class="badge">${DATA.tier_label[item.tier] || item.tier}</span>
+        <span class="epsilon-badge">epsilon = ${item.epsilon}</span>
+      </div>
+      <div class="code-card">${item.code.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>
+      <div class="verdict${isWarn ? ' warn-tone' : ''}">${item.verdict}</div>
+    </div></div>`;
+  wrap.querySelector('.item-head').addEventListener('click', () => {
+    wrap.classList.toggle('open');
+  });
+  list.appendChild(wrap);
+});
+</script>
+</body>
+</html>
+"""
+
+
+if __name__ == "__main__":
+    path = generate()
+    print(f"[epsilon_lab] scritto {path}")

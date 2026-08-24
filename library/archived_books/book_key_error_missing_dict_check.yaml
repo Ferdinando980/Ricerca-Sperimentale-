@@ -1,0 +1,35 @@
+id: book_key_error_missing_dict_check
+version: 1
+title: Fixing key error missing dict check bugs
+domain: programming
+problem_tags:
+- wrong-output
+- runtime-bug
+capability_tags:
+- missing-key-check
+- dict-access
+resource_tags:
+- python
+pattern_id: key_error_missing_dict_check
+canonical_problem_id: count_word_frequency
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- skill_generator_initial_verification
+procedure_text: "Symptom: A KeyError is raised during dictionary access, particularly\
+  \ on augmented assignment statements (e.g., `dict[key] += 1` or `dict[key].append(item)`)\
+  \ when encountering an uninitialized key.\n\nProcedure:\n1. Scan dictionary updates\
+  \ for patterns that read and mutate a key in a single step (`d[k] += ...`, `d[k]\
+  \ = d[k] + ...`, `d[k].append(...)`) without a prior membership check or initialization.\n\
+  2. Determine the expected fallback value for uninitialized keys (e.g., `0` for counts,\
+  \ `[]` for lists, `\"\"` for strings).\n3. Replace unsafe subscript reads with a\
+  \ safe retrieval method:\n   - For scalar accumulation: Change `d[k] += delta` to\
+  \ `d[k] = d.get(k, default) + delta`.\n   - For in-place collection mutations: Change\
+  \ `d[k].append(v)` to `d.setdefault(k, []).append(v)`.\n   - Alternatively, initialize\
+  \ `d` as a `collections.defaultdict` if changing the container type is acceptable\
+  \ in the function scope.\n4. Ensure the assignment target retains the original key\
+  \ expression and type.\n\nExample: In `count_word_frequency`, `counts[w] += 1` raises\
+  \ a KeyError on the first encounter of each word; it is fixed by replacing it with\
+  \ `counts[w] = counts.get(w, 0) + 1`."
+generation_method: skill_generator

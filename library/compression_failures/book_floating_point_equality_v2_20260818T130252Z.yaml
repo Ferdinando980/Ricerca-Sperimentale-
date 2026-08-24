@@ -1,0 +1,143 @@
+skill_id: book_floating_point_equality_v2
+pattern_id: floating_point_equality
+experiment_id: experiment1
+rejected_at: '2026-08-18T13:02:52.424026+00:00'
+status: REJECTED
+original_version: 2
+original_procedure_text: 'Symptom: Computed float comparison or membership check (`x
+  in list_of_floats`) fails due to precision mismatch.
+
+  Procedure:
+
+  1. Locate exact comparisons (`==`, `!=`, `in`) on arithmetic-derived floats.
+
+  2. Replace with tolerance checks: `abs(a - b) < epsilon` or `any(abs(a - b) < epsilon
+  for b in values)`, using a domain-appropriate epsilon (e.g., 1e-9).
+
+  3. Re-run tests; adjust epsilon if needed instead of reverting to exact comparison.'
+original_words: 65
+min_accept_ratio: 0.8
+n_candidates: 6
+candidates:
+- index: 1
+  procedure_text: 'Symptom: Float comparisons or membership checks fail due to precision
+    mismatch.
+
+
+    1. Find `==`, `!=`, or `in` on arithmetic floats.
+
+    2. Replace with `abs(a - b) < epsilon` or `any(abs(a - b) < epsilon for b in values)`
+    using appropriate epsilon (e.g., 1e-9).
+
+    3. Re-test; adjust epsilon if necessary.'
+  words: 49
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false
+- index: 2
+  procedure_text: 'Symptom: Float comparison or membership check (`x in list`) fails
+    due to precision.
+
+
+    1. Locate exact comparisons (`==`, `!=`, `in`) on arithmetic-derived floats.
+
+    2. Replace with tolerance checks: `abs(a - b) < epsilon` or `any(abs(a - b) <
+    epsilon for b in values)` using domain-appropriate epsilon (e.g., 1e-9).
+
+    3. Re-test; adjust epsilon if needed.'
+  words: 54
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false
+- index: 3
+  procedure_text: 'Symptom: Float comparison or membership check (`x in list`) fails
+    due to precision.
+
+
+    1. Locate exact comparisons (`==`, `!=`, `in`) on arithmetic-derived floats.
+
+    2. Replace with tolerance checks: `abs(a - b) < epsilon` or `any(abs(a - b) <
+    epsilon for b in values)`. Use domain-appropriate epsilon (e.g., 1e-9).
+
+    3. Re-run tests; adjust epsilon as needed.'
+  words: 55
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false
+- index: 4
+  procedure_text: 'Symptom: Float comparison or membership check (`x in list`) fails
+    due to precision.
+
+
+    Procedure:
+
+    1. Identify `==`, `!=`, or `in` on computed floats.
+
+    2. Replace with `abs(a - b) < epsilon` or `any(abs(a - b) < epsilon for b in values)`
+    using appropriate epsilon (e.g., 1e-9).
+
+    3. Test; adjust epsilon if needed.'
+  words: 52
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false
+- index: 5
+  procedure_text: 'Symptom: Float comparison or membership check (`x in list`) fails
+    due to precision.
+
+
+    1. Locate exact comparisons (`==`, `!=`, `in`) on arithmetic-derived floats.
+
+    2. Replace with `abs(a - b) < epsilon` or `any(abs(a - b) < epsilon for b in values)`.
+    Use domain-appropriate epsilon (e.g., 1e-9).
+
+    3. Test; adjust epsilon if needed, never revert to exact comparison.'
+  words: 57
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false
+- index: 6
+  procedure_text: 'Symptom: Float comparison or membership check (`x in list`) fails
+    due to precision.
+
+
+    1. Locate exact comparisons (`==`, `!=`, `in`) on calculated floats.
+
+    2. Replace with tolerance checks: `abs(a - b) < epsilon` or `any(abs(a - b) <
+    epsilon for b in values)`. Use domain-appropriate epsilon (e.g., 1e-9).
+
+    3. Test; adjust epsilon as needed.'
+  words: 54
+  passed_n: 1
+  per_task:
+    floating_point_equality__average_matches_target__known_example:
+      original_passed: true
+      compressed_passed: true
+    floating_point_equality__temperature_reached__variant:
+      original_passed: true
+      compressed_passed: false

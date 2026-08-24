@@ -1,0 +1,37 @@
+id: book_floating_point_equality_v4
+version: 4
+title: Finding floating-point equality bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- flaky-numeric-comparison
+capability_tags:
+- floating-point
+- equality-check
+resource_tags:
+- python
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- manual_fix_2026-08-18
+- self_compression_reverify
+procedure_text: 'Symptom: Comparison or membership check (`==`, `!=`, `in`) fails
+  for computed floats due to precision errors.
+
+
+  1. Locate all arithmetic float comparisons.
+
+  2. Replace with `abs(a - b) < epsilon` for scalars, or `any(abs(a - b) < epsilon
+  for b in values)` for membership. Never use `min()` or `max()` for membership; they
+  crash on empty sequences.
+
+  3. Derive `epsilon` from your data’s precision (e.g., if data has 2 decimal places,
+  use 0.01). Avoid arbitrary tiny values (1e-6) unless verifying exact arithmetic
+  identities.
+
+  4. If tests fail, distinguish between precision errors (adjust `epsilon`) and crashes
+  (handle empty sequences/input edge cases).'

@@ -1,0 +1,35 @@
+id: book_wrong_accumulator_init_v2_v3_v4
+version: 4
+title: Finding wrong-accumulator-initialization bugs (compressed) (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-count
+- wrong-leading-element
+capability_tags:
+- accumulator-init
+- loop-state
+resource_tags:
+- python
+pattern_id: wrong_accumulator_init
+canonical_problem_id: count_vowels
+status: VERIFIED
+confidence: 1.0
+verification_count: 4
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- self_compression_reverify
+procedure_text: 'Symptom: Accumulation off by constant or contains spurious initial
+  element.
+
+
+  1. Ensure accumulator initialization precedes loop.
+
+  2. Verify initialization value (e.g., 0 vs empty) aligns with loop logic.
+
+  3. Trace small input to confirm.
+
+  4. Adjust initialization accordingly.'
+derived_from: book_wrong_accumulator_init_v2_v3
+generation_method: compression

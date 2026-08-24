@@ -1,0 +1,25 @@
+id: book_wrong_accumulator_init_v2_v3
+version: 3
+title: Finding wrong-accumulator-initialization bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- wrong-count
+- wrong-leading-element
+capability_tags:
+- accumulator-init
+- loop-state
+resource_tags:
+- python
+pattern_id: wrong_accumulator_init
+canonical_problem_id: count_vowels
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+procedure_text: "Symptom: Loop-accumulated results have incorrect offsets or spurious\
+  \ leading elements. \n1. Identify accumulator initialization. \n2. Verify initial\
+  \ value matches loop logic. \n3. Hand-trace first iteration. \n4. Correct the initialization;\
+  \ do not patch the loop body."

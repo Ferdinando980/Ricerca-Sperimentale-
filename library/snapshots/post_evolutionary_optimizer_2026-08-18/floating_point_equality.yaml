@@ -1,0 +1,55 @@
+id: book_floating_point_equality
+version: 3
+title: "Finding floating-point equality bugs"
+domain: programming
+problem_tags: [wrong-boolean-output, flaky-numeric-comparison]
+capability_tags: [floating-point, equality-check]
+resource_tags: [python]
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types: [external, manual_fix_2026-08-18]
+procedure_text: |
+  Symptom: a comparison involving a computed float (a sum, an average, a
+  division result) rejects a value that is mathematically correct but not
+  bit-for-bit identical -- or a membership check (`x in list_of_floats`) never
+  matches.
+  Procedure:
+  1. Find every `==`/`!=`/`in` that involves a value derived from arithmetic on
+     floats (anything that went through `/`, or accumulated many additions).
+  2. Floats computed by different arithmetic paths are essentially never exactly
+     equal, even when mathematically they should be -- exact equality or exact
+     membership on such values is close to always wrong.
+  3. Replace with a tolerance-based comparison using `any(...)`/`abs(...)`
+     directly, NEVER `min(...)`/`max(...)` over a generator:
+       - single value: `abs(a - b) < epsilon`
+       - membership (`a in values`): `any(abs(a - b) < epsilon for b in values)`
+     Do NOT write `min(abs(a - b) for b in values) < epsilon` as a shortcut for
+     membership -- `min()`/`max()` raise `ValueError` on an empty sequence,
+     while `any()` on an empty sequence correctly returns `False`. This is a
+     real, observed failure mode (not hypothetical): a candidate fix using
+     `min()` passed every non-empty-input test and only crashed on the
+     empty-input case, which is easy to miss by eye but always worth a
+     dedicated test.
+  4. Do NOT default to a tiny epsilon (1e-9, 1e-6) "to be safe" -- too tight is
+     just as wrong as exact equality, and is a real, observed failure mode: a
+     candidate fix used `abs(r - target) < 1e-6` on temperature readings
+     `[98.6, 100.005]` vs target `100.0` (a 0.005 gap) and wrongly rejected it,
+     because 0.005 is not smaller than 1e-6. Derive epsilon from the task's
+     own examples instead of guessing: find the smallest gap between a value
+     the examples say SHOULD count as a match and one that should NOT, and
+     pick an epsilon between them. As a rule of thumb, `1e-9` is for exact
+     arithmetic identities (e.g. checking a sum/average computed two ways
+     agree); real-world measurements (temperature, distance, sensor/instrument
+     readings) usually need a much looser tolerance, often `0.01` or coarser
+     -- look at the precision of the numbers given in the examples themselves
+     (e.g. values given to 2 decimal places imply a tolerance around 0.01, not
+     tighter).
+  5. Re-run the tests -- if a test still fails after this fix, check first
+     whether it's an assertion failure (epsilon too loose OR too tight) or a
+     crash (exception) on a specific input like an empty sequence; these need
+     different fixes, don't assume it's always "make epsilon smaller".
+  Example (this Book's canonical case): `average_matches_target` compared a
+  computed average to a target with `==` instead of an epsilon tolerance.

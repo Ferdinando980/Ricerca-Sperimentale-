@@ -1,0 +1,33 @@
+id: book_integer_division_truncation
+version: 1
+title: Finding / vs // division bugs
+domain: programming
+problem_tags:
+- wrong-numeric-output
+- type-error-on-index
+capability_tags:
+- integer-division
+- type-error
+resource_tags:
+- python
+pattern_id: integer_division_truncation
+canonical_problem_id: rolling_average
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- external
+procedure_text: "Symptom: either (a) a result that should be a fraction comes out\
+  \ as a truncated\ninteger, or (b) a `TypeError: list indices must be integers` /\
+  \ similar crash\nwhere a value computed by division is used as an index.\nProcedure:\n\
+  1. Find every `/` and `//` in the function.\n2. If the result feeds into indexing\
+  \ or slicing (`arr[x]`, `range(x)`), it must\n   use `//` (integer division) --\
+  \ Python will not silently coerce a float index.\n3. If the result is a numeric\
+  \ answer meant to be a true average/ratio, it must\n   use `/` (true division) --\
+  \ `//` silently drops the fractional part with no\n   error, which is easy to miss\
+  \ without checking exact expected values.\n4. Fix by using the operator the value's\
+  \ downstream use requires, and re-run the\n   tests -- pay attention to whether\
+  \ expected outputs in the test suite are\n   integers or floats.\nExample (this\
+  \ Book's canonical case): a rolling average used `sum(chunk) //\nwindow` instead\
+  \ of `sum(chunk) / window`, silently truncating every average to\nan integer.\n"
+duplicate_of: null

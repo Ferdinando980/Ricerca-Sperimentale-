@@ -1,0 +1,36 @@
+id: book_off_by_one_v2
+version: 2
+title: Finding off-by-one loop/range bugs (compressed)
+domain: programming
+problem_tags:
+- off-by-one
+- wrong-output
+- boundary-missed
+capability_tags:
+- off-by-one
+- loop-bounds
+resource_tags:
+- python
+pattern_id: off_by_one
+canonical_problem_id: binary_search
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- self_compression_reverify
+procedure_text: 'Symptom: Wrong/missing result at first or last element of a sequence;
+  middle elements are correct.
+
+
+  Procedure:
+
+  1. Identify all loop bounds and index/length comparisons (e.g., `range(n)`, `lo
+  <= hi`).
+
+  2. Manually trace the smallest valid case (single/two-element) to see if the boundary
+  element is processed.
+
+  3. Replace `<`/`<=` or adjust `range` boundaries as needed.
+
+  4. Correct to the required boundary-inclusive form and verify all tests pass.'

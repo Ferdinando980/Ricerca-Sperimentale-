@@ -1,0 +1,32 @@
+id: book_mutable_default_argument_v2_v3
+version: 3
+title: Finding mutable-default-argument bugs (compressed) (compressed)
+domain: programming
+problem_tags:
+- state-leaks-across-calls
+- wrong-output-on-repeat-call
+capability_tags:
+- mutable-default-argument
+- python-gotcha
+resource_tags:
+- python
+pattern_id: mutable_default_argument
+canonical_problem_id: dedupe_preserve_order
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+procedure_text: 'Symptom: Function returns correct results on first call, but accumulated
+  results on subsequent calls.
+
+
+  1. Check for mutable default arguments.
+
+  2. Replace them with `None`.
+
+  3. Initialize inside function: `val = [] if val is None else val`.
+
+  4. Verify with multi-call tests.'

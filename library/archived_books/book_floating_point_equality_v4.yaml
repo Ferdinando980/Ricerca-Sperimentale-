@@ -1,0 +1,33 @@
+id: book_floating_point_equality_v4
+version: 4
+title: Finding floating-point equality bugs (compressed)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- flaky-numeric-comparison
+capability_tags:
+- floating-point
+- equality-check
+resource_tags:
+- python
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 2
+verification_types:
+- external
+- manual_fix_2026-08-18
+- self_compression_reverify
+procedure_text: "Symptom: Arithmetic-derived float comparisons (`==`, `!=`) or `in`\
+  \ checks fail due to precision errors.\n\n1. Locate all `==`/`!=`/`in` involving\
+  \ computed floats.\n2. Replace with tolerance-based logic:\n   - Single value: `abs(a\
+  \ - b) < epsilon`\n   - Membership: `any(abs(a - b) < epsilon for b in values)`\n\
+  \   - Avoid `min()`/`max()` for membership; they raise `ValueError` on empty inputs\
+  \ where `any()` correctly returns `False`.\n3. Derive epsilon from data precision,\
+  \ not arbitrary defaults. Use `1e-9` only for exact arithmetic identities; use task-specific\
+  \ precision (e.g., `0.01` for two-decimal measurements) for real-world data.\n4.\
+  \ On test failure, distinguish between assertion errors (adjust epsilon) and exceptions\
+  \ (check empty sequences)."
+derived_from: book_floating_point_equality
+generation_method: compression
