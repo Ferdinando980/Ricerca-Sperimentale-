@@ -70,7 +70,12 @@ COMPRESSION_FAILURES_DIR = Path(__file__).resolve().parent / "library" / "compre
 # load_books() never reads this directory -- routing/_latest_per_pattern is
 # unaffected, only historical id->pattern_id lookups consult it.
 ARCHIVED_BOOKS_DIR = Path(__file__).resolve().parent / "library" / "archived_books"
-LOG_DIR = ROOT_DIR / "logs"
+# Anchored to this file's own folder (not ROOT_DIR/Ricerca) so the logs --
+# the real evidence behind every empirical claim in README.md -- live inside
+# the cognitive_rpg git repo and travel with it (moved here from Ricerca/logs/
+# on 2026-08-24, after the public repo push made the old location invisible
+# to anyone reading the README on GitHub).
+LOG_DIR = Path(__file__).resolve().parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 _CURRENT_EXPERIMENT_FILE = LOG_DIR / ".current_experiment"

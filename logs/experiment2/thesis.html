@@ -1,0 +1,282 @@
+<title>Memoria vs Competenza</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+:root{
+  --paper:#F6F7F9; --surface:#FFFFFF; --ink:#171B24; --ink-muted:#4B5163;
+  --line:#DEE1E7; --accent:#1D6E63; --accent-ink:#0E4740;
+  --cfg-a:#55606E; --cfg-b:#B4791F; --cfg-f:#1D6E63; --cfg-c:#7D5AA6;
+  --good:#1D7A46; --bad:#B23B3B;
+  --font-display:'Newsreader',Georgia,'Times New Roman',serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12151B; --surface:#1A1E27; --ink:#E7E9EE; --ink-muted:#9CA3B4;
+    --line:#2A2F3B; --accent:#4FB3A3; --accent-ink:#8FD8CB;
+    --cfg-a:#8891A0; --cfg-b:#D9A34E; --cfg-f:#4FB3A3; --cfg-c:#A98BD1;
+    --good:#4CAF7D; --bad:#E07070;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12151B; --surface:#1A1E27; --ink:#E7E9EE; --ink-muted:#9CA3B4;
+  --line:#2A2F3B; --accent:#4FB3A3; --accent-ink:#8FD8CB;
+  --cfg-a:#8891A0; --cfg-b:#D9A34E; --cfg-f:#4FB3A3; --cfg-c:#A98BD1;
+  --good:#4CAF7D; --bad:#E07070;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-body); font-size:16px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.shell{display:grid; grid-template-columns:240px minmax(0,1fr); gap:0; max-width:1180px; margin:0 auto;}
+nav.toc{
+  position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  padding:2.5rem 1.25rem 2rem 1.5rem; border-right:1px solid var(--line);
+}
+nav.toc .eyebrow{
+  font-family:var(--font-mono); font-size:.72rem; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-muted); margin:0 0 1rem;
+}
+nav.toc ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.15rem;}
+nav.toc a{
+  display:block; padding:.4rem .6rem; border-radius:4px; text-decoration:none;
+  color:var(--ink-muted); font-size:.88rem; border-left:2px solid transparent;
+}
+nav.toc a:hover{color:var(--ink); background:color-mix(in srgb, var(--accent) 8%, transparent);}
+nav.toc .live-badge{
+  margin-top:1.5rem; padding:.6rem .7rem; border:1px solid var(--line); border-radius:6px;
+  font-family:var(--font-mono); font-size:.72rem; color:var(--ink-muted); line-height:1.5;
+}
+nav.toc .live-badge .dot{
+  display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--good);
+  margin-right:.4em; box-shadow:0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent);
+}
+main{padding:2.5rem 3rem 6rem; min-width:0;}
+.title-block{margin-bottom:3rem;}
+.title-block .eyebrow{
+  font-family:var(--font-mono); font-size:.75rem; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--accent-ink); margin:0 0 .8rem;
+}
+h1{
+  font-family:var(--font-display); font-weight:600; font-size:2.6rem;
+  line-height:1.15; margin:0 0 .6rem; text-wrap:balance;
+}
+.subtitle{
+  font-family:var(--font-display); font-style:italic; font-size:1.15rem;
+  color:var(--ink-muted); max-width:52ch; margin:0; text-wrap:balance;
+}
+section{max-width:68ch; margin:0 0 3.2rem;}
+section.wide{max-width:none;}
+h2{
+  font-family:var(--font-display); font-weight:600; font-size:1.55rem;
+  margin:0 0 .3rem; text-wrap:balance; display:flex; align-items:baseline; gap:.6rem;
+}
+h2 .num{font-family:var(--font-mono); font-size:.85rem; color:var(--ink-muted); font-weight:400;}
+h3{font-family:var(--font-display); font-weight:600; font-size:1.15rem; margin:1.6rem 0 .5rem;}
+p{margin:0 0 1rem;}
+.lede{color:var(--ink-muted); font-size:.95rem; margin-bottom:1.6rem;}
+strong{font-weight:600;}
+code, .mono{font-family:var(--font-mono); font-size:.86em;}
+code{
+  background:color-mix(in srgb, var(--ink) 6%, transparent); padding:.1em .35em;
+  border-radius:3px;
+}
+.formula{
+  font-family:var(--font-mono); font-size:.92rem; background:var(--surface);
+  border:1px solid var(--line); border-left:3px solid var(--accent);
+  padding:.85rem 1.1rem; border-radius:4px; margin:.7rem 0 1.1rem;
+  overflow-x:auto; white-space:pre;
+}
+dl.glossary{margin:0;}
+dl.glossary dt{
+  font-family:var(--font-mono); font-weight:600; font-size:.95rem;
+  color:var(--ink); margin-top:1.4rem; padding-top:1.4rem; border-top:1px solid var(--line);
+}
+dl.glossary dt:first-child{margin-top:0; padding-top:0; border-top:none;}
+dl.glossary dd{margin:.4rem 0 0; color:var(--ink-muted);}
+.table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:6px; margin:0 0 1.5rem;}
+table{border-collapse:collapse; width:100%; font-size:.9rem;}
+th, td{
+  text-align:left; padding:.55rem .8rem; border-bottom:1px solid var(--line);
+  white-space:nowrap;
+}
+thead th{
+  font-family:var(--font-mono); font-size:.72rem; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--ink-muted); background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+tbody tr:last-child td{border-bottom:none;}
+td.num, th.num{font-variant-numeric:tabular-nums; font-family:var(--font-mono); text-align:right;}
+.swatch{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:.45em; vertical-align:middle;}
+.cfg-a{background:var(--cfg-a);} .cfg-b{background:var(--cfg-b);}
+.cfg-f{background:var(--cfg-f);} .cfg-c{background:var(--cfg-c);}
+.pass{color:var(--good); font-weight:600;} .fail{color:var(--bad); font-weight:600;}
+.bar-track{background:color-mix(in srgb, var(--ink) 8%, transparent); border-radius:3px; height:6px; overflow:hidden; min-width:64px;}
+.bar-fill{height:100%; background:var(--accent); border-radius:3px;}
+.stat-row{display:flex; align-items:center; gap:.6rem;}
+.grid-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.9rem; margin:0 0 1.6rem;}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:8px;
+  padding:1rem 1.1rem;
+}
+.card .k{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-muted); margin:0 0 .35rem;}
+.card .v{font-family:var(--font-display); font-size:1.7rem; font-weight:600; font-variant-numeric:tabular-nums;}
+.note{
+  font-size:.88rem; color:var(--ink-muted); background:var(--surface);
+  border:1px solid var(--line); border-radius:6px; padding:.8rem 1rem; margin:.8rem 0 0;
+}
+.warn{
+  font-size:.88rem; color:var(--ink); background:color-mix(in srgb, var(--bad) 10%, var(--surface));
+  border:1px solid var(--bad); border-radius:6px; padding:.8rem 1rem; margin:.8rem 0 0;
+}
+.warn ul{margin:.4rem 0 0; padding-left:1.2rem;}
+.footer{
+  max-width:68ch; margin-top:4rem; padding-top:1.5rem; border-top:1px solid var(--line);
+  font-size:.82rem; color:var(--ink-muted);
+}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr;}
+  nav.toc{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);}
+  main{padding:2rem 1.25rem 4rem;}
+  h1{font-size:2rem;}
+}
+</style>
+<div class="shell">
+<nav class="toc"><p class="eyebrow">Indice</p><ol><li><a href="#intro">1. Domanda di ricerca</a></li><li><a href="#design">2. Disegno sperimentale</a></li><li><a href="#glossario">3. Glossario e formule</a></li><li><a href="#leggere">4. Dove trovare cosa</a></li><li><a href="#risultati">5. Risultati correnti</a></li><li><a href="#limiti">6. Limiti e metodo</a></li></ol><div class="live-badge"><span class="dot"></span>Ultimo aggiornamento<br>2026-08-19 22:10 UTC<br>experiment_id: <code>experiment2</code></div></nav>
+<main>
+<div class="title-block">
+<p class="eyebrow">Cognitive RPG &middot; note di metodologia</p>
+<h1>Memoria vs Competenza</h1>
+<p class="subtitle">Quanto della performance di un modello economico assistito deriva da una capacita’ generalizzabile, e quanto dall’aver semplicemente gia’ visto la risposta?</p>
+</div>
+<section id="intro">
+<h2><span class="num">&sect;1</span>Domanda di ricerca</h2>
+<p>Un modello linguistico piccolo ed economico (<strong>Small</strong>) puo’ avvicinarsi a un modello grande e costoso (<strong>Expert</strong>) su un compito di debugging, se gli si da’ accesso a conoscenza esterna? E se si’, quella conoscenza deve essere generalizzabile — una <em>procedura</em> — o basta una <em>soluzione specifica</em> gia’ vista in precedenza?</p>
+<p>Il secondo caso e’ il punto centrale: un sistema che sembra "imparare" potrebbe in realta’ star solo recuperando risposte memorizzate. Questo documento confronta quattro configurazioni sperimentali costruite apposta per separare le due ipotesi, e riporta i risultati correnti mano a mano che l’esperimento avanza.</p>
+</section>
+<section id="design">
+<h2><span class="num">&sect;2</span>Disegno sperimentale</h2>
+<p>Ogni task e’ una funzione Python con un bug reale, verificata con test automatici (pytest) — il risultato non e’ mai un giudizio soggettivo, e’ un pass/fail eseguibile. Lo stesso task viene affrontato da quattro configurazioni:</p>
+<div class="grid-cards">
+<div class="card"><p class="k"><span class="swatch cfg-a"></span>A</p><p class="v" style="font-size:1.1rem">Expert da solo</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-b"></span>B</p><p class="v" style="font-size:1.1rem">Small da solo</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-f"></span>F</p><p class="v" style="font-size:1.1rem">Small + Skill Library</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-c"></span>C</p><p class="v" style="font-size:1.1rem">Small + Solution Bank (Cheater)</p></div>
+</div>
+<p><strong>A</strong> ed <strong>B</strong> sono le due baseline pure (nessun aiuto esterno). <strong>F</strong> riceve, quando pertinente, una skill scritta a mano o generata (Skill Library) — una procedura di debugging generale, non legata a un problema specifico. <strong>C</strong> riceve invece, quando disponibile, una <em>soluzione</em> gia’ corretta a un problema pregresso (Solution Bank) — non una procedura, un esempio risolto specifico.</p>
+<h3>Split KNOWN / VARIANT / NOVEL</h3>
+<p>Ogni pattern di bug ha un esempio canonico ("known_example") e almeno una variante ("variant", stesso pattern, problema diverso). Un task e’ <strong>KNOWN</strong> se e’ l’esempio canonico stesso di un pattern coperto, <strong>VARIANT</strong> se e’ un problema diverso dello stesso pattern coperto, <strong>NOVEL</strong> se il pattern non e’ coperto affatto. Alcuni pattern sono <em>permanentemente</em> NOVEL per design: sono il gruppo di controllo, nessuna skill/soluzione viene mai costruita per loro.</p>
+<h3>Coverage NONE / PARTIAL / FULL</h3>
+<p>Per F e C, ogni retrieval produce una coverage: <strong>NONE</strong> (niente di pertinente trovato — F/C degradano a comportarsi come B), <strong>FULL</strong> (match esatto/completo — per F un book copre tutti i tag del task, per C il task e’ lo stesso identico problema di cui esiste soluzione), <strong>PARTIAL</strong> (match parziale — per C, la soluzione disponibile e’ di un problema diverso ma della stessa famiglia).</p>
+</section>
+<section id="glossario">
+<h2><span class="num">&sect;3</span>Glossario e formule</h2>
+<p class="lede">Ogni metrica usata nei report (<code>recap.md</code>, <code>knowledge_map.md</code>) e in questa pagina, con la formula esatta.</p>
+<dl class="glossary">
+<dt>accuracy</dt><div class="formula">accuracy = quest_passate / quest_totali</div><dd>Per una singola config, o per (config, split), o per (config, coverage) -- sempre la stessa formula, cambia solo il gruppo su cui si conta.</dd>
+<dt>tok/task</dt><div class="formula">tok_per_task = token_totali / n_task</div><dd>Token medi per quest, indipendentemente dal risultato.</dd>
+<dt>tok/successo</dt><div class="formula">tok_per_successo = token_totali / quest_passate</div><dd>Non lo stesso di tok/task: un config con qualche fallimento sta comunque spendendo quei token senza un risultato utile -- confronto piu' onesto quando le accuracy non sono identiche tra config.</dd>
+<dt>Δ F vs B / Δ C vs B / Δ C vs F</dt><div class="formula">delta = accuracy(config_1) − accuracy(config_2)</div><dd>Differenza diretta di accuracy tra due config sull'intero dataset. Δ C vs F e' la domanda centrale del Cheater Agent: soluzione specifica contro skill generalizzata.</dd>
+<dt>Δ Retrieval</dt><div class="formula">delta_retrieval = accuracy(coverage=FULL) − accuracy(coverage=NONE)   [dentro lo stesso config, F o C]</div><dd>Isola l'effetto del retrieval stesso: se e' vicino a zero, avere il meccanismo non aiuta quando non trova nulla -- atteso. Se e' grande e positivo, trovare qualcosa di pertinente conta davvero.</dd>
+<dt>Δ Architecture</dt><div class="formula">delta_architecture = accuracy(config-FULL) − accuracy(B)</div><dd>Quanto l'intera architettura (non solo il retrieval) supera il modello nudo, guardando solo ai casi in cui il retrieval ha trovato qualcosa.</dd>
+<dt>build_cost (ammortamento skill)</dt><div class="formula">build_cost = token spesi dall'Optimizer per comprimere/riverificare quello skill (ogni tentativo, accettato o no)</div><dd>Costo una tantum per pattern, non per uso.</dd>
+<dt>breakeven</dt><div class="formula">saving = tok_medi(A) − tok_medi(F)  sui task di quel pattern
+breakeven = build_cost / saving   (se saving > 0, altrimenti mai)</div><dd>Dopo quanti usi il costo di costruzione dello skill si ripaga rispetto a chiamare sempre Expert.</dd>
+<dt>classificazione economica</dt><div class="formula">economic_value = HIGH  se saving > 0  e  breakeven <= 20 usi
+accuracy_value = HIGH  se F ha risolto un task che A o B avevano fallito
+
+label = ECONOMICALLY_POSITIVE  se economic_value = HIGH
+        ACCURACY_POSITIVE      se economic_value = LOW e accuracy_value = HIGH
+        NEGATIVE               se entrambi LOW</div><dd>NEGATIVE non significa “elimina questo skill” -- puo' avere valore strategico non catturato da queste due sole metriche, specialmente con cosi' pochi dati.</dd>
+<dt>densita’ della libreria</dt><div class="formula">densita = contenuti_distinti / file_su_disco
+(contenuti_distinti = cluster di file giudicati DUPLICATE dal Similarity Checker)</div><dd>Il numero di skill non e' la metrica giusta -- una libreria con 100 duplicati e' peggiore di una con 20 skill davvero distinte.</dd>
+</dl>
+</section>
+<section id="leggere">
+<h2><span class="num">&sect;4</span>Dove trovare cosa</h2>
+<p>Tutto in <code>logs/{experiment_id}/</code>. <code>recap.md</code> e’ il riassunto testuale completo (9 sezioni: avanzamento, confronto A/B/F/C, retrieval vs architecture, token accounting, ammortamento skill, fallimenti, uso skill, optimizer, mappa sezioni). <code>knowledge_map.md</code> e’ il dettaglio per sezione/pattern di bug. <code>observer_table.csv</code>/<code>quest_scores.csv</code> sono i dati grezzi per analisi esterne. <code>city.html</code> e’ la mappa visuale. Questa pagina (<code>thesis.html</code>) e’ generata da <code>experiment/thesis_doc.py</code>, rilanciabile in qualunque momento senza costo (nessuna chiamata ai modelli, solo lettura locale).</p>
+</section>
+<section id="risultati" class="wide">
+<h2><span class="num">&sect;5</span>Risultati correnti</h2>
+<p class="lede">Rigenerato dal vivo da <code>experiment2</code>: 104/156 quest completate (39 task &times; 4 config).</p>
+<div class="warn"><strong>&#9888; Difetto noto nel benchmark stesso</strong> (non nello skill/config in esame) -- i risultati su questi task non significano quello che sembrano:<ul><li><code>floating_point_equality__temperature_reached__variant</code>: A/B's recorded PASS on this task does not mean they derived a correct tolerance: both write `any(r >= target for r in readings)` (no epsilon at all), which is wrong vs. the true correct_source (fails a reading just under target within tolerance -- verified 2026-08-19). bug_catalog.py's own test suite for this task never covers that case, so this has passed as correct in every run that includes it. See experiment/canary.py for the investigation.</li></ul></div>
+<div class="warn"><strong>&#128300; Meccanismo dello skill dimostrato causalmente</strong> (non solo osservato per correlazione) -- da tenere presente leggendo i numeri di F su questo pattern:<ul><li><code>floating_point_equality</code>: F's epsilon on a no-hint task is NOT derived from the task's scale -- causally demonstrated (not just observed), 2026-08-19: manipulating the skill's tier-c fallback constant (1e-9 -> 2.5e-6 -> 7e-4) changed F's answer in lockstep, 12/12 runs across 2 unrelated no-hint tasks, while manipulating the unrelated tier-b (currency) constant changed nothing (0 leakage, 6/6 runs) -- and the reverse check also held: changing tier-c did not touch F's tier-b (currency) answer either, 3/3 runs. F correctly selects which tier applies, but performs no scale-sensitive reasoning within tier-c -- it substitutes that tier's literal constant verbatim. This is not 'reciting an example' in the loose sense (no semantic choice between multiple examples in the text) -- it is mechanical substitution of a single designated slot. See experiment/canary.py and the skill's own YAML changelog for the full ablation. Any accuracy number for F on this pattern's no-hint cases should be read with this in mind, not as evidence of context-sensitive reasoning.
+REFINEMENT 2026-08-19 (staged probing + rule-substitution test): the finding above is about faithfully following THIS skill's literal-constant instruction, not a capability ceiling. Asking F, outside the skill text, to (1) name the property that should determine epsilon and (2) compute epsilon given that property's value handed to it directly -- F still answered the skill's literal 1e-9 both times, ignoring the given value entirely: it does not spontaneously invent a grounding strategy the skill didn't authorize. But rewriting tier-c ITSELF to require deriving epsilon from a stated magnitude (instead of a literal constant) made F actually perform the derivation -- correctly tracking magnitude across a ~1e7 range in two replications (200-300 units -> ~1e-4; 0.001-0.005 units -> exactly 5e-9), with one minor arithmetic slip in the first case (used 1e-4 instead of the correct 2.5e-4). Net picture: F reliably APPLIES whatever rule tier-c states -- literal substitution if told to substitute, genuine (if not perfectly precise) scale-derivation if told to derive -- but does not initiate derivation on its own when the operative rule is a literal constant. The bottleneck is instruction content, not model capability.
+VALIDATION 2026-08-19 (delegated-arithmetic tier-c, not yet live): the one arithmetic slip in the refinement above (1e-4 instead of 2.5e-4) is a known LLM weakness -- silent token-by-token arithmetic, not unreliable scale-tracking -- so a tier-c wording was tested that asks F to extract the stated magnitude into a variable and write epsilon as an INTERPRETER-EVALUATED EXPRESSION (e.g. `epsilon = 1e-6 * typical_magnitude`) instead of hand-computing and hardcoding the final number. Validated on 7 runs across 5 tasks: the two original magnitude domains (200-300 units, 0.001-0.005 units) now produce a correct expression with no arithmetic to get wrong; a THIRD domain never used to write the rule (400-600 kg shipment weights) generalized correctly on first try (typical_magnitude=500, epsilon=1e-6*500); both genuinely no-magnitude tasks (sensor_readings_agree x2, same_destination x1) still correctly fell back to the untouched literal 1e-9 default, not a hallucinated expression -- selectivity between 'derive' and 'no basis to derive, use the safe default' held 5/5; and the currency tier-b task was unaffected (still 0.01, 1/1). Not yet adopted as the live procedure_text -- this is a validated research result, deployment is a separate, deliberate decision (consistent with two failed rewrite attempts earlier in this same investigation). Also note the cost tradeoff this rule trades into: reasoning through a derivation costs more tokens per call than blind literal substitution, moving F's per-task cost toward (not to) Expert's -- see the token-accounting figures elsewhere in this report.
+CORRECTION 2026-08-19 (the 'third domain' claim above, overclaimed): 'F generalizes to shipment_weight_match' was graded against 1e-6 * stated_magnitude -- the same formula the same investigator wrote into the rule, same session. That checks rule-application fidelity, not whether 1e-6*magnitude is an objectively correct real-world tolerance. Applying the canary check that already invalidated 3 of 4 CATEGORY_C domains: does unaided Expert independently converge near the same answer? No -- 3/3 reps, Expert produces `math.isclose(weight_a, weight_b)` (rel_tol=1e-9 default, essentially machine-precision equality), nothing near 1e-6*magnitude, no real engagement with the stated range. shipment_weight_match does NOT pass canary validation -- it joins the underdetermined bucket, not the validated-answer bucket. The same caveat applies retroactively to the two original magnitude domains (instrument, sensor) that built the rule -- never independently canary-checked either. What survives: F reliably applies an explicit formula to unseen data (mechanically verifiable, Category-A-like). What does not survive: any claim that 1e-6*magnitude is a validated convention -- it is as author-arbitrary as any other constant flagged in this investigation.
+RESOLUTION 2026-08-19 (a genuine second CATEGORY_C domain, found and confirmed with F, the sharpest positive result in this chapter): unlike shipment_weight_match, significant-figures-implied precision (low decimal-asymmetry, small nonzero numeric distance -- e.g. 13.7 vs 13.68) WAS independently validated -- unaided Expert converges on `round(x,1)==round(y,1)` 11/12 times across 3 deliberately non-textbook pairs (ruling out memorization of a stock physics example: novel pairs converged MORE consistently than the original 7.2/7.21, 92% vs 75% -- the opposite of what memorization predicts). F was then tested with two decimal structures at once (1v2 decimals -> expected eps 0.05; 2v3 decimals -> expected eps 0.005) crossed with skill condition: baseline (sig-figs not in tier-b) fell to tier-c's 1e-9 (3/3) or misfired to currency's 0.01 by loose semantic association with 'dial' (2/3 on the 2v3 task, a THIRD failure type this chapter hadn't catalogued -- generalization via surface word similarity, not blind substitution and not correct derivation) -- neither correct; a research variant adding sig-figs as a second tier-b convention got 6/6 correct, AND -- decisively -- produced DIFFERENT epsilon values per task (0.05 vs 0.005), each correctly scaled to that task's own decimal structure, with the reasoning written out. A single memorized-constant substitution mechanism cannot produce two different, each-independently-correct numbers -- this is the first clean resolution of recitation-vs-derivation in this chapter on a domain confirmed not to be a lucky-scale coincidence (unlike currency's 0.01, which was never tested against a case requiring a different magnitude). Not adopted as live procedure_text -- same deliberate-deployment-decision principle as the delegated-arithmetic result above. FOLLOW-UP (same day): the 2v3-decimal structure used in the F test had never itself been independently checked on A (every prior A-validation used 1v2 decimals) -- lower risk than shipment_weight_match since the formula (0.5*10^-d) was already validated, extending it to a new d is not a fresh guess -- but closed anyway: 4/4 exact on a fresh 2v3 pair, independent of the F test's own task. See experiment/canary.py FOLLOW-UPS 1-5 for the full elimination of confounds that preceded this.</li></ul></div>
+<div class="warn"><strong>&#9888; Provider/modello misto dentro questo run</strong> -- questi config hanno usato piu' di una combinazione provider/modello (probabile switch a meta' run): confronti tra config diversi restano validi, ma se citi questi numeri in modo formale tienilo presente.<ul><li>- A: gemini/gemini-3.7-flash, gemini_vertex/gemini-3.7-flash</li><li>- B: gemini/gemini-3.1-flash-lite, gemini_vertex/gemini-3.1-flash-lite</li><li>- F: gemini/gemini-3.1-flash-lite, gemini_vertex/gemini-3.1-flash-lite</li><li>- C: gemini/gemini-3.1-flash-lite, gemini_vertex/gemini-3.1-flash-lite</li></ul></div>
+<div class="warn"><strong>&#128184; Analisi controfattuale costo di retrieval</strong> (F vs B stesso task, zero chiamate nuove) -- su 20 quest con skill iniettata, <strong>16 (80.0%)</strong> hanno visto B passare comunque senza aiuto (overhead pagato senza beneficio misurato, 2072 token totali); 3 mostrano un beneficio reale; 1 mostrano lo skill peggiorare l'esito. Pattern con beneficio misurato in questo run: floating_point_equality, wrong_string_case_comparison.</div>
+<div class="grid-cards">
+<div class="card"><p class="k"><span class="swatch cfg-a"></span>A &mdash; Expert</p><p class="v">96.2%</p><p class="note" style="margin-top:.5rem">n=26</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-b"></span>B &mdash; Small</p><p class="v">84.6%</p><p class="note" style="margin-top:.5rem">n=26</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-f"></span>F &mdash; Skill</p><p class="v">96.2%</p><p class="note" style="margin-top:.5rem">n=26</p></div>
+<div class="card"><p class="k"><span class="swatch cfg-c"></span>C &mdash; Cheater</p><p class="v">96.2%</p><p class="note" style="margin-top:.5rem">n=26</p></div>
+</div>
+<h3>Accuracy per config &times; split</h3>
+<div class="table-wrap"><table><thead><tr><th>config</th><th>split</th><th class="num">n</th><th class="num">accuracy</th><th>&nbsp;</th></tr></thead><tbody>
+<tr><td><span class="swatch cfg-a"></span>A</td><td>KNOWN</td><td class="num">10</td><td class="num">90.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:90%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-a"></span>A</td><td>NOVEL</td><td class="num">6</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-a"></span>A</td><td>VARIANT</td><td class="num">10</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>KNOWN</td><td class="num">10</td><td class="num">80.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:80%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>NOVEL</td><td class="num">6</td><td class="num">83.3%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:83%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>VARIANT</td><td class="num">10</td><td class="num">90.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:90%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-c"></span>C</td><td>KNOWN</td><td class="num">10</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-c"></span>C</td><td>NOVEL</td><td class="num">6</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-c"></span>C</td><td>VARIANT</td><td class="num">10</td><td class="num">90.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:90%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-f"></span>F</td><td>KNOWN</td><td class="num">10</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-f"></span>F</td><td>NOVEL</td><td class="num">6</td><td class="num">100.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:100%"></div></div></td></tr>
+<tr><td><span class="swatch cfg-f"></span>F</td><td>VARIANT</td><td class="num">10</td><td class="num">90.0%</td><td><div class="bar-track" style="width:90px"><div class="bar-fill" style="width:90%"></div></div></td></tr>
+</tbody></table></div>
+<h3><span class="swatch cfg-f"></span>F Small + Skill Library &mdash; per coverage</h3>
+<div class="table-wrap"><table><thead><tr><th>coverage</th><th class="num">n</th><th class="num">accuracy</th></tr></thead><tbody>
+<tr><td>NONE</td><td class="num">6</td><td class="num">100.0%</td></tr>
+<tr><td>FULL</td><td class="num">20</td><td class="num">95.0%</td></tr>
+</tbody></table></div>
+<p class="note">Δ Retrieval (FULL − NONE) = -5.0% &nbsp;|&nbsp; Δ Architecture (F-FULL − B) = +10.4%</p>
+<h3><span class="swatch cfg-c"></span>C Small + Solution Bank (Cheater) &mdash; per coverage</h3>
+<div class="table-wrap"><table><thead><tr><th>coverage</th><th class="num">n</th><th class="num">accuracy</th></tr></thead><tbody>
+<tr><td>NONE</td><td class="num">6</td><td class="num">100.0%</td></tr>
+<tr><td>PARTIAL</td><td class="num">10</td><td class="num">90.0%</td></tr>
+<tr><td>FULL</td><td class="num">10</td><td class="num">100.0%</td></tr>
+</tbody></table></div>
+<p class="note">Δ Retrieval (FULL − NONE) = +0.0% &nbsp;|&nbsp; Δ Architecture (C-FULL − B) = +15.4%</p>
+<h3>Token accounting</h3>
+<div class="table-wrap"><table><thead><tr><th>config</th><th class="num">input</th><th class="num">output</th><th class="num">reasoning</th><th class="num">totale</th><th class="num">tok/task</th><th class="num">tok/successo</th></tr></thead><tbody>
+<tr><td><span class="swatch cfg-a"></span>A</td><td class="num">3959</td><td class="num">1813</td><td class="num">10041</td><td class="num">15813</td><td class="num">608</td><td class="num">633</td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td class="num">3959</td><td class="num">1765</td><td class="num">0</td><td class="num">5724</td><td class="num">220</td><td class="num">260</td></tr>
+<tr><td><span class="swatch cfg-f"></span>F</td><td class="num">6988</td><td class="num">1843</td><td class="num">0</td><td class="num">8831</td><td class="num">340</td><td class="num">353</td></tr>
+<tr><td><span class="swatch cfg-c"></span>C</td><td class="num">6067</td><td class="num">1799</td><td class="num">0</td><td class="num">7866</td><td class="num">303</td><td class="num">315</td></tr>
+</tbody></table></div>
+<h3>Classificazione economica per pattern</h3>
+<div class="table-wrap"><table><thead><tr><th>pattern</th><th>accuracy_value</th><th>economic_value</th><th>classificazione</th></tr></thead><tbody>
+<tr><td><code>floating_point_equality</code></td><td>HIGH</td><td>LOW</td><td>ACCURACY_POSITIVE</td></tr>
+<tr><td><code>index_out_of_range_boundary</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>integer_division_truncation</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>inverted_boolean_logic</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>key_error_missing_dict_check</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>mutable_default_argument</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>off_by_one</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>wrong_accumulator_init</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>wrong_comparison_operator</code></td><td>LOW</td><td>LOW</td><td>NEGATIVE</td></tr>
+<tr><td><code>wrong_string_case_comparison</code></td><td>HIGH</td><td>HIGH</td><td>ECONOMICALLY_POSITIVE</td></tr>
+</tbody></table></div>
+<h3>Quest fallite</h3>
+<div class="table-wrap"><table><thead><tr><th>config</th><th>split</th><th>task</th></tr></thead><tbody>
+<tr><td><span class="swatch cfg-a"></span>A</td><td>KNOWN</td><td><code>floating_point_equality__average_matches_target__known_example</code></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>KNOWN</td><td><code>floating_point_equality__average_matches_target__known_example</code></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>NOVEL</td><td><code>variable_shadowing__reverse_words__novel_b</code></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>KNOWN</td><td><code>wrong_string_case_comparison__find_matching_tag__known_example</code></td></tr>
+<tr><td><span class="swatch cfg-b"></span>B</td><td>VARIANT</td><td><code>wrong_string_case_comparison__is_valid_username__variant</code></td></tr>
+<tr><td><span class="swatch cfg-c"></span>C</td><td>VARIANT</td><td><code>floating_point_equality__temperature_reached__variant</code></td></tr>
+<tr><td><span class="swatch cfg-f"></span>F</td><td>VARIANT</td><td><code>floating_point_equality__temperature_reached__variant</code></td></tr>
+</tbody></table></div>
+</section>
+<section id="limiti">
+<h2><span class="num">&sect;6</span>Limiti e metodo</h2>
+<p><strong>Campione piccolo</strong>: 1-2 task per (pattern, split) &mdash; una sola run per cella. Un singolo fallimento non basta per dire se e’ un problema sistematico o rumore del modello; serve ripetere lo stesso task piu’ volte per distinguerli.</p>
+<p><strong>Solution Bank (C) usa il ground truth, non l’output reale dell’Expert</strong>: la "soluzione pregressa" del Cheater e’ il <code>correct_source</code> gia’ scritto in <code>bug_catalog.py</code>, non un transcript reale di quello che Expert ha effettivamente generato (mai persistito, per design, per non salvare output grezzo dei modelli). Proxy ragionevole -- A ottiene tipicamente il 95-100% di accuracy -- ma non identico.</p>
+<p><strong>Costi a $0.00</strong> se il prezzo del provider non e’ configurato in <code>.env</code> &mdash; i confronti sui token restano validi, quelli in dollari no, finche’ non e’ impostato.</p>
+</section>
+<div class="footer">Cognitive RPG &middot; generato da <code>python -m cognitive_rpg.experiment.thesis_doc experiment2</code> &middot; 2026-08-19 22:10 UTC</div>
+</main></div>
