@@ -75,22 +75,6 @@ def _progress(tasks, records):
     return len(done), total, missing
 
 
-def _librarian_overhead(records):
-    """F vs B input-token delta on the SAME task_id -- both run on the Small
-    model with the same base prompt, so any difference is the skill text the
-    Librarian injected for F, isolated from anything else that varies between
-    configs (model, reasoning, task difficulty)."""
-    input_by_task_cfg = {(r["task_id"], r["config_name"]): r["input_tokens"] for r in records}
-    diffs = []
-    for (task_id, cfg), inp in input_by_task_cfg.items():
-        if cfg != "F":
-            continue
-        b_inp = input_by_task_cfg.get((task_id, "B"))
-        if b_inp is not None:
-            diffs.append(inp - b_inp)
-    return diffs
-
-
 def _optimizer_cost(events):
     input_tot = output_tot = 0
     n_compress = n_reverify = 0
@@ -347,7 +331,7 @@ def build_recap(experiment_id: str) -> str:
         "quindi e' un confronto piu' onesto di tok/task quando le accuracy non sono identiche."
     )
     L.append("")
-    overhead = _librarian_overhead(records)
+    overhead = metrics.librarian_overhead(records)
     if overhead:
         L.append(
             f"- Overhead della Libreria (F vs B, stesso task): +{sum(overhead)/len(overhead):.0f} "

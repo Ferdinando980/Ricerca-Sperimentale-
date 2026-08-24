@@ -80,6 +80,24 @@ def token_accounting(records):
     return by
 
 
+def librarian_overhead(records):
+    """F vs B input-token delta on the SAME task_id -- both run on the Small
+    model with the same base prompt, so any difference is the skill text the
+    Librarian injected for F, isolated from anything else that varies between
+    configs (model, reasoning, task difficulty). Moved here from recap.py
+    (2026-08-24) so readme_update.py can reuse the exact same computation
+    instead of re-deriving it and risking the two reports disagreeing."""
+    input_by_task_cfg = {(r["task_id"], r["config_name"]): r["input_tokens"] for r in records}
+    diffs = []
+    for (task_id, cfg), inp in input_by_task_cfg.items():
+        if cfg != "F":
+            continue
+        b_inp = input_by_task_cfg.get((task_id, "B"))
+        if b_inp is not None:
+            diffs.append(inp - b_inp)
+    return diffs
+
+
 def mixed_provider_warnings(records, configs=CONFIGS):
     """Flags configs that used more than one (provider, model) pair within the
     SAME experiment_id -- e.g. a run started on the AI Studio "gemini" provider
