@@ -87,4 +87,3 @@ def route(task: Task, max_books: int = 2, min_overlap: int = 1, respect_value_po
         coverage = "PARTIAL"
 
     return SkillPackage(books=top_books, coverage=coverage)
-# mirror_drift test touch
