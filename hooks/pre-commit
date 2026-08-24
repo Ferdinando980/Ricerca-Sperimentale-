@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs on every commit in this repo (enabled via `git config core.hooksPath hooks`).
+# Versioned here, not in .git/hooks/, so it's not lost on a fresh clone.
+#
+# Warns (never blocks) about cognitive_rpg <-> Jarvis mirror drift via
+# tools/mirror_drift.py --warn-only -- a fragile-by-construction signal (file
+# mtime via git commit time) that flags, never gates. README.md's own
+# results section has a separate, explicit update step (readme_update.py,
+# wired into tools/run_all.bat) rather than a commit hook -- it needs real
+# experiment log data to mean anything, which a routine code commit doesn't
+# necessarily have anything to do with.
+set +e
+PYTHON="../.venv/Scripts/python.exe"
+if [ ! -x "$PYTHON" ]; then PYTHON="python"; fi
+"$PYTHON" ../tools/mirror_drift.py --warn-only
+exit 0
