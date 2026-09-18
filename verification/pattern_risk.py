@@ -37,20 +37,27 @@ def check_pattern_risk(
 ) -> PatternRiskResult:
     rule = rule_generalization.extract_rule_stable(book, generator_adapter)
     if rule is not None:
-        scenarios = rule_generalization.generate_contrasting_scenarios(book, rule, generator_adapter)
-        if scenarios is None:
-            # Regola trovata ma impossibile generare scenari contrastanti
-            # auto-verificati -- non scendere silenziosamente all'asse
-            # metodo: sarebbe un test diverso da quello per cui la regola e'
-            # stata trovata, non un fallback legittimo.
+        # Aggregato su piu' campioni (2026-09-18), non piu' un singolo
+        # scenario contrastante -- trovato dal vivo: il verdetto di un solo
+        # trial flippava GENERALIZES/DOES_NOT_GENERALIZE/GENERALIZES su tre
+        # run reali dello stesso libro immutato, la stessa instabilita' gia'
+        # risolta altrove con il voto a maggioranza.
+        aggregated = rule_generalization.run_rule_generalization_checks(
+            experiment_id, book, rule, generator_adapter, test_adapter,
+        )
+        if aggregated is None:
+            # Regola trovata ma impossibile generare NEMMENO uno scenario
+            # contrastante auto-verificato -- non scendere silenziosamente
+            # all'asse metodo: sarebbe un test diverso da quello per cui la
+            # regola e' stata trovata, non un fallback legittimo.
             return PatternRiskResult(
                 pattern_id=book.pattern_id, book_id=book.id, axis="NUMERIC_RULE", verdict="INCONCLUSIVE",
                 detail="regola trovata ma impossibile generare scenari contrastanti auto-verificati",
             )
-        result = rule_generalization.run_rule_generalization_check(
-            experiment_id, book, rule, scenarios, test_adapter, generator_adapter,
-        )
-        return PatternRiskResult(pattern_id=book.pattern_id, book_id=book.id, axis="NUMERIC_RULE", verdict=result.verdict, detail=result.judge_reason)
+        detail = f"{aggregated.n_trials} trial ({aggregated.n_generalizes} generalizes, {aggregated.n_does_not_generalize} does_not, {aggregated.n_anti_pattern} anti_pattern, {aggregated.n_inconclusive} inconclusive)"
+        if aggregated.example is not None:
+            detail += f" -- esempio: {aggregated.example.judge_reason or 'letterale ripetuto verbatim'}"
+        return PatternRiskResult(pattern_id=book.pattern_id, book_id=book.id, axis="NUMERIC_RULE", verdict=aggregated.verdict, detail=detail)
 
     method = method_trap.extract_method_stable(book, generator_adapter)
     if method is not None:

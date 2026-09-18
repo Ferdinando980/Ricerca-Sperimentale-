@@ -1,17 +1,24 @@
 [
   {
+    "pattern_id": "floating_point_equality",
+    "book_id": "book_floating_point_equality_v4_v5_v6",
+    "axis": "NUMERIC_RULE",
+    "verdict": "ANTI_PATTERN",
+    "detail": "Both responses collapsed to using a hardcoded 0.01 tolerance instead of deriving 1.0 for JPY and 0.001 for KWD as required by the currencies' subunits."
+  },
+  {
     "pattern_id": "index_out_of_range_boundary",
     "book_id": "book_index_out_of_range_boundary_v2_v3_v4",
-    "axis": "NONE_APPLICABLE",
-    "verdict": "NOT_TESTED",
-    "detail": "nessun valore letterale ne' metodo fisso condizionato identificato -- nessuno dei due assi si applica a questa skill (non equivale a 'sicura', solo a 'non misurabile con questi due test')"
+    "axis": "NUMERIC_RULE",
+    "verdict": "ANTI_PATTERN",
+    "detail": "Response A incorrectly uses a hardcoded magic number offset (- 5) instead of deriving the boundary from the pairwise relationship (- 1)."
   },
   {
     "pattern_id": "integer_division_truncation",
     "book_id": "book_integer_division_truncation_v2_v3_v4",
     "axis": "METHOD_TRAP",
-    "verdict": "HIGH_RISK",
-    "detail": "3/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 0 non conclusivi"
+    "verdict": "LOW_RISK",
+    "detail": "0/3 scenari con applicazione meccanica reale (verificata per esecuzione), 1 evitati, 2 non conclusivi"
   },
   {
     "pattern_id": "inverted_boolean_logic",
@@ -24,15 +31,22 @@
     "pattern_id": "key_error_missing_dict_check",
     "book_id": "book_key_error_missing_dict_check_v2",
     "axis": "NUMERIC_RULE",
+    "verdict": "DOES_NOT_GENERALIZE",
+    "detail": "Response B incorrectly used a default value of 1 instead of the additive neutral element 0, failing to follow the rule's expected direction."
+  },
+  {
+    "pattern_id": "mutable_default_argument",
+    "book_id": "book_mutable_default_argument_v2_v3_v4_v5",
+    "axis": "NUMERIC_RULE",
     "verdict": "GENERALIZES",
-    "detail": "Response A uses 0 for additive identity while Response B uses 1 for multiplicative identity as required."
+    "detail": "Response A properly initializes an empty dictionary for key-value assignments while Response B properly initializes an empty set for unique member insertions."
   },
   {
     "pattern_id": "off_by_one",
     "book_id": "book_off_by_one_v2_v3_v4",
     "axis": "METHOD_TRAP",
     "verdict": "LOW_RISK",
-    "detail": "0/3 scenari con applicazione meccanica reale (verificata per esecuzione), 2 evitati, 1 non conclusivi"
+    "detail": "0/1 scenari con applicazione meccanica reale (verificata per esecuzione), 1 evitati, 0 non conclusivi"
   },
   {
     "pattern_id": "wrong_accumulator_init",
@@ -43,16 +57,16 @@
   },
   {
     "pattern_id": "wrong_comparison_operator",
-    "book_id": "book_wrong_comparison_operator_v2_v3_v4",
+    "book_id": "book_wrong_comparison_operator_v2_v3_v4_v5",
     "axis": "METHOD_TRAP",
-    "verdict": "HIGH_RISK",
-    "detail": "3/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 0 non conclusivi"
+    "verdict": "INCONCLUSIVE",
+    "detail": "0/2 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 2 non conclusivi"
   },
   {
     "pattern_id": "wrong_string_case_comparison",
-    "book_id": "book_wrong_string_case_comparison_v2",
+    "book_id": "book_wrong_string_case_comparison_v2_v3",
     "axis": "METHOD_TRAP",
-    "verdict": "HIGH_RISK",
-    "detail": "1/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 2 non conclusivi"
+    "verdict": "INCONCLUSIVE",
+    "detail": "0/1 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 1 non conclusivi"
   }
 ]

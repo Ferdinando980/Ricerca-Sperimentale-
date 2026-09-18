@@ -301,3 +301,85 @@ def run_rule_generalization_check(
         generalizes=generalizes, verdict=verdict, task_b_id=scenarios.task_b.task_id,
     )
     return result
+
+
+@dataclass
+class AggregatedGeneralizationResult:
+    pattern_id: str
+    book_id: str
+    rule: str
+    per_trial: list[GeneralizationResult]
+    n_trials: int
+    n_generalizes: int
+    n_does_not_generalize: int
+    n_anti_pattern: int
+    n_inconclusive: int
+    verdict: str  # ANTI_PATTERN | GENERALIZES | DOES_NOT_GENERALIZE | INCONCLUSIVE
+    example: GeneralizationResult | None  # a representative failing trial, for a repair prompt to point at
+
+
+def run_rule_generalization_checks(
+    experiment_id: str, book: Book, rule: RuleSpec, adapter: ModelAdapter, test_adapter: ModelAdapter,
+    n_trials: int = 3,
+) -> AggregatedGeneralizationResult | None:
+    """Majority-aggregated version of run_rule_generalization_check
+    (2026-09-18) -- a single contrasting-scenario pair turned out to be
+    exactly the kind of noisy single-sample judgment this whole project has
+    repeatedly found unstable elsewhere (identify_slot/extract_rule/extract_
+    method all needed voting for the same reason). Found live: key_error_
+    missing_dict_check's real risk verdict flipped GENERALIZES/DOES_NOT_
+    GENERALIZE/GENERALIZES across 3 separate real runs on the unchanged
+    book -- exactly the flip pattern that motivated stabilizer.vote_for_
+    result, now applied to the actual RISK JUDGMENT itself, not just the
+    rule-extraction step (extract_rule_stable already votes, but that only
+    stabilizes IDENTIFYING the rule, not judging whether it generalizes).
+
+    ANTI_PATTERN is treated specially, NOT folded into the majority vote:
+    it is a DETERMINISTIC, verbatim-substring fact (the literal actually
+    appears in the wrong place), not a judge's soft opinion -- one real
+    occurrence across N independent trials is real evidence of a
+    substitution risk on its own, the same way method_trap.py's MECHANICAL_
+    APPLICATION is treated as real evidence rather than something noise can
+    vote away. GENERALIZES/DOES_NOT_GENERALIZE (the judge's opinion) are
+    majority-voted among the conclusive trials only, mirroring method_trap.
+    py's own conclusive-only denominator. Returns None if not even one
+    trial could be generated (nothing to aggregate)."""
+    trials: list[GeneralizationResult] = []
+    for _ in range(n_trials):
+        scenarios = generate_contrasting_scenarios(book, rule, adapter)
+        if scenarios is None:
+            continue
+        trials.append(run_rule_generalization_check(experiment_id, book, rule, scenarios, test_adapter, adapter))
+    if not trials:
+        return None
+
+    anti_pattern_trials = [t for t in trials if t.anti_pattern_triggered]
+    n_generalizes = sum(1 for t in trials if t.verdict == "GENERALIZES")
+    n_does_not = sum(1 for t in trials if t.verdict == "DOES_NOT_GENERALIZE")
+    n_anti = len(anti_pattern_trials)
+    n_inconclusive = sum(1 for t in trials if t.verdict == "INCONCLUSIVE")
+
+    if anti_pattern_trials:
+        verdict = "ANTI_PATTERN"
+        example = anti_pattern_trials[0]
+    elif n_generalizes == 0 and n_does_not == 0:
+        verdict = "INCONCLUSIVE"
+        example = trials[0]
+    elif n_does_not > n_generalizes:
+        verdict = "DOES_NOT_GENERALIZE"
+        example = next(t for t in trials if t.verdict == "DOES_NOT_GENERALIZE")
+    elif n_generalizes > n_does_not:
+        verdict = "GENERALIZES"
+        example = next(t for t in trials if t.verdict == "GENERALIZES")
+    else:
+        # Pareggio tra GENERALIZES e DOES_NOT_GENERALIZE -- fail closed
+        # verso il piu' cauto, stesso principio di ogni voto in questo
+        # package (un pareggio non e' una maggioranza chiara).
+        verdict = "DOES_NOT_GENERALIZE"
+        example = next(t for t in trials if t.verdict == "DOES_NOT_GENERALIZE")
+
+    return AggregatedGeneralizationResult(
+        pattern_id=book.pattern_id, book_id=book.id, rule=rule.rule, per_trial=trials, n_trials=len(trials),
+        n_generalizes=n_generalizes, n_does_not_generalize=n_does_not, n_anti_pattern=n_anti,
+        n_inconclusive=n_inconclusive, verdict=verdict, example=example,
+    )

@@ -1,0 +1,43 @@
+id: book_index_out_of_range_boundary_v2_v3_v4_v5
+version: 5
+title: Finding index/slice boundary bugs (compressed) (compressed) (compressed) (rule-repaired)
+domain: programming
+problem_tags:
+- wrong-output-at-boundary
+- index-error-risk
+capability_tags:
+- index-boundary
+- slicing
+resource_tags:
+- python
+pattern_id: index_out_of_range_boundary
+canonical_problem_id: run_length_encode
+status: VERIFIED
+confidence: 1.0
+verification_count: 5
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+- self_compression_reverify
+- rule_repair_reverify
+procedure_text: "Rule: When trimming or selecting a subrange, slice start and end\
+  \ indices must be calculated from explicit boundary exclusion counts (header length\
+  \ H to drop from start, footer length F to drop from end) rather than hardcoded\
+  \ offsets.\n\nSymptom: IndexError or missing first/last element due to len()-derived\
+  \ index/slice bounds.\n\n1. Audit all len()-derived indices/bounds (e.g., arr[len(x)],\
+  \ range(1, len(s)-1)).\n2. Manually verify valid index range: max index is len-1,\
+  \ never len.\n3. If IndexError: bound reaches len (should be len-1).\n4. If missing\
+  \ edge or off-by-one slice:\n   - Observable signal: Identify the explicit header\
+  \ trim count H (number of leading elements to drop) and footer trim count F (number\
+  \ of trailing elements to drop) specified in the problem statement or docstring.\n\
+  \   - Direct mechanical mapping:\n     * Start index = H (use 0 or omit start bound\
+  \ if H = 0).\n     * End index = len(seq) - F (or -F when F > 0). When F = 0 (no\
+  \ trailing elements excluded), end index must be len(seq) or omitted (e.g., seq[H:]),\
+  \ never len(seq) - 1 or :-1.\n   - Conservative fallback: If H or F cannot be determined\
+  \ from text, inspect sample inputs/outputs to count exact leading and trailing items\
+  \ removed; if no boundary elements are excluded, default to H = 0 and F = 0.\n5.\
+  \ Verify using first/last-element test cases."
+derived_from: book_index_out_of_range_boundary_v2_v3_v4
+generation_method: rule_repair
