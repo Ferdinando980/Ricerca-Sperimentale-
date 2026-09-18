@@ -4,7 +4,14 @@ Lasciato in sospeso il 2026-09-18 su richiesta esplicita ("non fare i test,
 lascia il resto da fare nel to-do") dopo il rollout sistematico del
 template di prompt (vedi `template-instructions.md`). In ordine di priorità.
 
-## 1. Riverificare causalmente le prompt appena toccate dal rollout
+**Nuova direttiva (2026-09-18, punto 9 del template) da applicare qui:**
+non serve dimostrare che le nuove formulazioni siano strettamente
+migliori — la promozione (tenerle come versione live, fidarsene quanto
+prima) richiede solo evidenza che NON producano regressioni rilevanti sui
+casi reali già noti. Un pareggio è un risultato accettabile, non un
+motivo per tornare indietro.
+
+## 1. Verificare l'assenza di regressioni nelle prompt toccate dal rollout
 
 Il rollout sistematico (campo `"reasoning"` scritto per primo, delimitatori
 ```) è stato applicato a:
@@ -17,18 +24,19 @@ Il rollout sistematico (campo `"reasoning"` scritto per primo, delimitatori
 - `librarian/similarity.py` (classify_pair, ordine invertito)
 
 Solo le prompt di `detective.py` sono state ri-testate su dati reali dopo
-la modifica. Le altre sono pipeline storicamente validate il cui
-comportamento potrebbe essere cambiato con la nuova formulazione — vanno
-ripassate con gli stessi criteri di rigore usati oggi (dati reali, non
-assunzioni) prima di fidarsene quanto prima.
+la modifica. Per le altre: ri-passarle sui casi reali già noti da questa
+sessione (es. i 4 casi di identificazione slot/regola/metodo con storia
+di instabilità) e confermare che il risultato non sia peggiorato — non
+serve dimostrare un miglioramento, basta l'assenza di regressione.
 
-## 2. Riverificare check_content_preserved / check_concreteness_preserved contro i risultati storici di optimizer.py
+## 2. Verificare check_content_preserved / check_concreteness_preserved contro i risultati storici di optimizer.py
 
-Queste due funzioni avevano una protezione esplicita ("tenute byte per
+Stessa logica del punto 1, applicata specificamente qui perché queste due
+funzioni avevano una protezione esplicita più stretta ("tenute byte per
 byte identiche per non destabilizzare la pipeline matura di
-optimizer.py"), rimossa oggi su richiesta esplicita dell'utente. Vanno
-ripassate sui casi storici di compressione già accettati/rifiutati da
-`optimizer.py` per confermare che il verdetto non sia cambiato.
+optimizer.py"), rimossa oggi su richiesta esplicita dell'utente. Ripassarle
+sui casi storici di compressione già accettati/rifiutati da `optimizer.py`
+e confermare che il verdetto non sia cambiato (non che sia migliorato).
 
 ## 3. Caratterizzazione statistica più solida del nuovo livello di floating_point_equality (v7)
 

@@ -92,15 +92,17 @@ Output (JSON, "reasoning" SEMPRE come primo campo):
    Qualsiasi lista statica derivata da una misura ha bisogno di una
    funzione gemella che la ricalcoli su dati freschi a comando.
 
-9. **Non toccare un prompt senza un bug dimostrato solo perché una tecnica sembra buona.**
-   Applicare i punti 1-6 a `detective.py` era giustificato da bug reali e
-   riproducibili trovati quel giorno. Gli STESSI punti sono stati
-   deliberatamente NON applicati ai prompt già validati di
-   `slot_identifier.py`/`method_trap.py`/`rule_generalization.py`/
-   `stabilizer.py` nella stessa sessione, perché nessun bug era stato
-   trovato lì — cambiare un prompt storicamente stabile senza evidenza
-   rischia di reintrodurre instabilità per un beneficio solo ipotetico.
-   Guidato dall'evidenza, non dalla tecnica.
+9. **Testa liberamente le nuove tecniche; non promuoverle senza evidenza.**
+   Una tecnica supportata dalla letteratura è una buona ragione per creare
+   e testare una variante, ma non per sostituire automaticamente un prompt
+   già validato. La promozione richiede evidenza empirica sul task reale:
+   la correzione di un fallimento osservato, oppure un miglioramento
+   riproducibile rispetto al baseline. Non serve che sia strettamente
+   migliore su ogni caso testato — basta che non produca regressioni
+   rilevanti, perché potrebbe comunque aiutare in casi non ancora visti.
+   Non evitare una tecnica solo perché non abbiamo ancora un bug che la
+   giustifichi; evitare invece di SOSTITUIRE ciò che è già validato senza
+   aver prima verificato che la nuova versione non peggiori nulla.
 
 ## Dove si applica
 
