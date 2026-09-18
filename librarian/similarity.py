@@ -92,7 +92,7 @@ def classify_pair(book_a, book_b, adapter) -> dict:
         f"Book A -- \"{book_a.title}\" (pattern: {book_a.pattern_id}):\n{book_a.procedure_text.strip()}\n\n"
         f"Book B -- \"{book_b.title}\" (pattern: {book_b.pattern_id}):\n{book_b.procedure_text.strip()}"
     )
-    result = adapter.complete(prompt=prompt, system=_SIMILARITY_SYSTEM_PROMPT, max_tokens=200)
+    result = adapter.complete(prompt=prompt, system=_SIMILARITY_SYSTEM_PROMPT, max_tokens=200, thinking_budget=0)
     lines = [l.strip() for l in result.text.strip().splitlines() if l.strip()]
     label = lines[0].upper() if lines else ""
     reasoning = lines[1] if len(lines) > 1 else ""

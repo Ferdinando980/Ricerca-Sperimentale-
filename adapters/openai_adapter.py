@@ -31,7 +31,11 @@ class OpenAIAdapter(ModelAdapter):
         prompt: str,
         system: str | None = None,
         max_tokens: int = 1024,
+        thinking_budget: int | None = None,
     ) -> CompletionResult:
+        # thinking_budget: no matching OpenAI parameter for the model used
+        # here. Accepted and ignored, same as every other adapter without a
+        # real knob (see adapters/base.py's docstring).
         messages = []
         if system:
             messages.append({"role": "system", "content": system})

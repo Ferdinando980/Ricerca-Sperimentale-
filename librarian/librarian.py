@@ -32,6 +32,34 @@ LOW_VALUE_RETRIEVAL_PATTERNS = {
 }
 
 
+# Meccanismo per skill generiche, non legate a un pattern di bug specifico --
+# "sempre incluse" bypassando il tag-matching, per una regola di ragionamento
+# potenzialmente utile a QUALSIASI task. Aggiunto 2026-09-17 per
+# `general_case_completeness` (verification/, sessione sul motore di
+# sostituzione meccanica), poi RIMOSSO lo stesso giorno dopo un vero run
+# experiment_0 (A/B/F/C, 39 task, coverage=NONE isolato): sugli stessi 33
+# task dove F non aveva nessuna skill specifica, B (Gemma nudo) ha fatto
+# 84.8%, F (Gemma + solo quella skill generica) 63.6% -- un calo di 21 punti,
+# non rumore. La validazione originale (calculate_median 0/4->4/4,
+# rolling_average 1/4->2/4) era su 2 casi scelti apposta perche' avevano
+# bisogno esattamente di quel ragionamento -- mai testata sul caso ordinario
+# dove non serve, e li' costa piu' di quanto aiuti (token, il modello si
+# mette a cercare casi nascosti che non esistono). Insegnamento generale: una
+# skill "sempre attiva" va validata su un campione ampio e vario PRIMA di
+# essere collegata qui, non solo sul caso che ha motivato a scriverla.
+# `book_general_case_completeness.yaml` resta in libreria (non e' pericolosa
+# di per se', i suoi capability_tags non intersecano nessun task reale, quindi
+# resta comunque irraggiungibile anche dal tag-matching normale) -- solo
+# l'inclusione incondizionata e' stata rimossa. L'infrastruttura sotto resta,
+# per una futura skill genuinamente generica che sia stata validata su un
+# campione ampio prima di essere collegata qui, non solo su 1-2 casi.
+ALWAYS_INCLUDED_PATTERN_IDS: set[str] = set()
+
+
+def _always_included_books(books: list[Book]) -> list[Book]:
+    return [b for b in _latest_per_pattern(books) if b.pattern_id in ALWAYS_INCLUDED_PATTERN_IDS]
+
+
 def _latest_per_pattern(books: list[Book]) -> list[Book]:
     """When the optimizer saves a compressed copy of a Book, it keeps the same
     pattern_id and bumps version, never overwriting the original file (see
@@ -66,12 +94,22 @@ def route(task: Task, max_books: int = 2, min_overlap: int = 1, respect_value_po
     old tag-overlap-only behavior -- e.g. to re-test whether a pattern's
     classification still holds after its Book changes, since this list is a
     snapshot of evidence, not a permanent verdict (see the set's own
-    comment)."""
+    comment). ALWAYS_INCLUDED_PATTERN_IDS (added 2026-09-17) e' un asse
+    separato -- una regola di ragionamento generica, non un match di pattern
+    -- e viene unita al risultato in ogni caso, anche quando
+    respect_value_policy fa scattare lo short-circuit sotto: NON conta ai
+    fini di `coverage`, che resta il segnale di retrieval PER-PATTERN che
+    metrics.py/knowledge_map.py gia' usano com'e'."""
+    all_books = load_books()
+    always_books = _always_included_books(all_books)
+
     if respect_value_policy and task.pattern_id in LOW_VALUE_RETRIEVAL_PATTERNS:
-        return SkillPackage(books=[], coverage="NONE")
+        return SkillPackage(books=always_books, coverage="NONE")
 
     scored = []
-    for book in _latest_per_pattern(load_books()):
+    for book in _latest_per_pattern(all_books):
+        if book.pattern_id in ALWAYS_INCLUDED_PATTERN_IDS:
+            continue  # gia' incluso incondizionatamente, non farlo pesare due volte sul matching per tag
         overlap = len(set(book.capability_tags) & set(task.capability_tags))
         if overlap >= min_overlap:
             scored.append((overlap, book))
@@ -86,4 +124,4 @@ def route(task: Task, max_books: int = 2, min_overlap: int = 1, respect_value_po
     else:
         coverage = "PARTIAL"
 
-    return SkillPackage(books=top_books, coverage=coverage)
+    return SkillPackage(books=always_books + top_books, coverage=coverage)

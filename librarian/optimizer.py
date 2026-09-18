@@ -10,12 +10,14 @@ Design decisions made explicitly here (none of this is in the user's original
 description, so they're spelled out rather than silently guessed):
   - WHO compresses: the Small-role adapter itself (the same model that actually
     uses the skill), not a separate "editor" role.
-  - TRIGGER: a skill whose average skill_context_tokens (real, from
+  - TRIGGER: a skill whose allocated share of skill_context_tokens (from
     RETRIEVAL_RESULT events) exceeds `min_avg_tokens` AND was used at least
-    `min_uses` times in the run.
-  - VERIFICATION: re-run pytest (real, same verifier as the main pipeline) on
-    every task that historically retrieved this skill, with ONLY the compressed
-    book injected (isolates this skill's effect).
+    `min_uses` times in the run. The package total is allocated by procedure
+    size so multi-skill retrievals are not charged in full to every book.
+  - VERIFICATION: use historically retrieved tasks for candidate selection,
+    but reserve a successful task as an independent holdout and re-run it only
+    after the shortest candidate has been selected. A skill is never marked
+    VERIFIED without that second check.
   - SELECTION (changed 2026-08-18, "evolutionary" pass): a single compression
     sample turned out to be noisy -- book_floating_point_equality looked like
     a clean reject (1/2 vs 2/2) on one sample, but 6 repeated samples showed
@@ -47,6 +49,7 @@ import sys
 from collections import defaultdict
 from dataclasses import asdict
 from datetime import datetime, timezone
+from math import ceil
 from pathlib import Path
 
 import yaml
@@ -60,10 +63,13 @@ from ..experiment.events import emit, read_events
 from ..experiment.experiment_log import read_all
 from ..library.loader import load_books
 from ..models import Book, SkillPackage
+from ..verification.stabilizer import check_content_preserved
 
 _OPTIMIZER_CONFIG = "OPTIMIZER"
 _N_CANDIDATES = 6
 _MIN_ACCEPT_RATIO = 0.8
+_MIN_BASELINE_SUCCESSES = 1
+_MIN_HOLDOUT_SUCCESSES = 2
 
 _COMPRESSION_SYSTEM_PROMPT = (
     "You compress debugging procedures for a shared knowledge library. You will "
@@ -73,6 +79,16 @@ _COMPRESSION_SYSTEM_PROMPT = (
     "procedure text, no preamble, no code fences."
 )
 
+# 2026-09-09: the two existing gates (shorter + historical/holdout tests still
+# pass) cannot catch a candidate that silently DROPS a real step or fact --
+# the on-record tasks are a proxy, not exhaustive coverage of everything the
+# procedure describes. Same judge pattern as similarity.py's classify_pair
+# check_content_preserved e' ora importato da verification/stabilizer.py
+# (estratto 2026-09-17, testo del prompt invariato byte per byte) cosi'
+# skill_repair.py/method_repair.py possono riusare lo stesso controllo
+# invece di non averne uno affatto -- vedi la docstring li' per il contesto
+# reale che ha motivato l'estrazione.
+
 
 def _skill_usage(experiment_id: str) -> dict[str, dict]:
     """Real per-skill stats from this run's own event log: how many times a
@@ -81,14 +97,28 @@ def _skill_usage(experiment_id: str) -> dict[str, dict]:
     read from the same run's log.jsonl."""
     events = read_events(experiment_id)
     records = {(r["task_id"], r["config_name"]): r["passed"] for r in read_all(experiment_id)}
+    books_by_id = {b.id: b for b in load_books()}
 
     usage: dict[str, dict] = defaultdict(lambda: {"uses": [], "quests": []})
     for e in events:
         if e["event_type"] != "RETRIEVAL_RESULT":
             continue
-        for skill_id in e["data"].get("skill_ids", []):
+        skill_ids = list(dict.fromkeys(e["data"].get("skill_ids", [])))
+        if not skill_ids:
+            continue
+        package_tokens = max(0, float(e["data"].get("skill_context_tokens", 0) or 0))
+        # RETRIEVAL_RESULT reports the package total, not an isolated cost per
+        # skill. Allocate it by procedure size so a package with three books
+        # cannot make each book look three times as expensive. Unknown books
+        # fall back to equal allocation (for old logs or archived ids).
+        weights = {skill_id: max(1, len(books_by_id[skill_id].procedure_text.split()))
+                   for skill_id in skill_ids if skill_id in books_by_id}
+        if len(weights) != len(skill_ids):
+            weights = {skill_id: 1 for skill_id in skill_ids}
+        total_weight = sum(weights.values()) or 1
+        for skill_id in skill_ids:
             key = (e["task_id"], e["config_name"])
-            usage[skill_id]["uses"].append(e["data"].get("skill_context_tokens", 0))
+            usage[skill_id]["uses"].append(package_tokens * weights[skill_id] / total_weight)
             usage[skill_id]["quests"].append(key)
 
     result = {}
@@ -102,6 +132,37 @@ def _skill_usage(experiment_id: str) -> dict[str, dict]:
             "original_passed": passed,
         }
     return result
+
+
+def _baseline_by_task(quest_keys: list[tuple[str, str]], records: dict[tuple[str, str], bool]) -> dict[str, bool]:
+    """Collapse config-level history to one conservative baseline per task."""
+    baseline: dict[str, bool] = {}
+    for task_id, config_name in quest_keys:
+        baseline[task_id] = baseline.get(task_id, False) or records.get((task_id, config_name)) is True
+    return baseline
+
+
+def _split_validation_quests(
+    quest_keys: list[tuple[str, str]], records: dict[tuple[str, str], bool]
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Reserve one historically successful task for a post-selection check.
+
+    The optimizer must not certify a candidate solely on the same examples it
+    used to choose the shortest wording. If the run has fewer than two
+    successful task examples, there is no defensible holdout and the caller
+    should leave the skill unverified until a richer run is available.
+    """
+    unique_task_ids = list(dict.fromkeys(task_id for task_id, _ in quest_keys))
+    baseline = _baseline_by_task(quest_keys, records)
+    successful = [task_id for task_id in unique_task_ids if baseline.get(task_id) is True]
+    if len(successful) < _MIN_HOLDOUT_SUCCESSES:
+        return list(quest_keys), []
+    holdout_task_id = successful[-1]
+    selection = [key for key in quest_keys if key[0] != holdout_task_id]
+    holdout = [key for key in quest_keys if key[0] == holdout_task_id]
+    if not any(baseline.get(task_id) is True for task_id, _ in selection):
+        return list(quest_keys), []
+    return selection, holdout
 
 
 def find_candidates(experiment_id: str, min_avg_tokens: float = 100.0, min_uses: int = 2) -> list[dict]:
@@ -140,6 +201,36 @@ def compress_skill(experiment_id: str, book: Book, adapter, candidate_index: int
     return compressed
 
 
+def _compression_prompt_tokens(adapter, procedure_text: str) -> int | None:
+    """Count the compression prompt with the provider's own tokenizer.
+
+    Claude/Gemini expose an exact count endpoint; OpenAI's adapter documents a
+    local estimate. If a provider is unavailable, return None and let the
+    optimizer fall back to the existing word guard rather than blocking a run.
+    """
+    prompt = (
+        f"Procedure to compress (currently {len(procedure_text.split())} words):\n\n"
+        f"{procedure_text}"
+    )
+    try:
+        return int(adapter.count_input_tokens(prompt=prompt, system=_COMPRESSION_SYSTEM_PROMPT))
+    except Exception:
+        return None
+
+
+def _event_tokens(events: list[dict]) -> int:
+    """Input + output + exposed reasoning tokens spent by optimizer calls."""
+    total = 0
+    for event in events:
+        if event.get("event_type") not in {"SKILL_COMPRESSION_FINISHED", "SKILL_REVERIFICATION"}:
+            continue
+        data = event.get("data", {})
+        total += int(data.get("input_tokens", 0) or 0)
+        total += int(data.get("output_tokens", 0) or 0)
+        total += int(data.get("reasoning_output_tokens", 0) or 0)
+    return total
+
+
 def verify_compressed(
     experiment_id: str, book: Book, compressed_text: str, quest_keys: list[tuple[str, str]], adapter,
     candidate_index: int | None = None,
@@ -173,7 +264,10 @@ def verify_compressed(
     return results
 
 
-def save_compressed_book(book: Book, compressed_text: str, output_dir: Path | None = None) -> Path:
+def save_compressed_book(
+    book: Book, compressed_text: str, output_dir: Path | None = None,
+    metadata: dict | None = None,
+) -> Path:
     new_id = f"{book.id}_v{book.version + 1}"
     data = {
         "id": new_id,
@@ -193,6 +287,8 @@ def save_compressed_book(book: Book, compressed_text: str, output_dir: Path | No
         "derived_from": book.id,  # Phase 4 genealogy (2026-08-18)
         "generation_method": "compression",
     }
+    if metadata:
+        data.update(metadata)
     out_path = (output_dir or config.LIBRARY_DIR) / f"{new_id}.yaml"
     out_path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return out_path
@@ -201,7 +297,8 @@ def save_compressed_book(book: Book, compressed_text: str, output_dir: Path | No
 def save_compression_failure(
     experiment_id: str, book: Book, attempts: list[dict],
     original_by_task: dict[str, bool | None], min_accept_ratio: float,
-    failures_dir: Path | None = None,
+    failures_dir: Path | None = None, *, status: str = "REJECTED",
+    rejection_reason: str | None = None,
 ) -> Path:
     """Rejected compressions used to just vanish -- the attempt was decided on
     and thrown away, leaving only a pass/fail count in the event log with no
@@ -224,7 +321,8 @@ def save_compression_failure(
         "pattern_id": book.pattern_id,
         "experiment_id": experiment_id,
         "rejected_at": datetime.now(timezone.utc).isoformat(),
-        "status": "REJECTED",
+        "status": status,
+        "rejection_reason": rejection_reason,
         "original_version": book.version,
         "original_procedure_text": book.procedure_text,
         "original_words": len(book.procedure_text.split()),
@@ -235,7 +333,14 @@ def save_compression_failure(
                 "index": a["index"],
                 "procedure_text": a["text"],
                 "words": a["words"],
+                "compression_prompt_tokens": a.get("compression_prompt_tokens"),
+                "optimizer_tokens": a.get("optimizer_tokens", 0),
                 "passed_n": a["passed_n"],
+                # Set only on `best` (see optimize()) -- content_preserved
+                # check runs once, on the already-selected candidate, not on
+                # every attempt.
+                "content_check_label": a["content_check"]["label"] if "content_check" in a else None,
+                "content_check_reasoning": a["content_check"]["reasoning"] if "content_check" in a else None,
                 "per_task": {
                     task_id: {
                         "original_passed": original_by_task.get(task_id),
@@ -264,23 +369,73 @@ def optimize(
     results = []
     for c in candidates:
         book = c["book"]
-        n_tasks = len(set(c["quests"]))
+        baseline_by_task = _baseline_by_task(c["quests"], records_by_key)
+        selection_quests, holdout_quests = _split_validation_quests(c["quests"], records_by_key)
+        selection_task_ids = set(task_id for task_id, _ in selection_quests)
+        holdout_task_ids = set(task_id for task_id, _ in holdout_quests)
+        n_tasks = len(selection_task_ids)
+        total_tasks = len(set(c["quests"]))
+        selection_original_passed = sum(1 for task_id in selection_task_ids if baseline_by_task.get(task_id) is True)
+        holdout_original_passed = sum(1 for task_id in holdout_task_ids if baseline_by_task.get(task_id) is True)
         original_words = len(book.procedure_text.split())
-        min_passed_needed = min_accept_ratio * c["original_passed"]
+        original_prompt_tokens = _compression_prompt_tokens(adapter, book.procedure_text)
+        min_passed_needed = min_accept_ratio * selection_original_passed
         print(
             f"[optimizer] {book.id}: {c['n_uses']} usi, {c['avg_skill_context_tokens']:.0f} token medi -- "
-            f"genero {n_candidates} candidati (soglia: >= {min_accept_ratio:.0%} di {c['original_passed']}/{n_tasks} originale)"
+            f"genero {n_candidates} candidati (soglia: >= {min_accept_ratio:.0%} di "
+            f"{selection_original_passed}/{n_tasks} selezione, holdout {holdout_original_passed}/{len(holdout_task_ids)})"
         )
+
+        # A zero-success baseline is not evidence that a procedure works, and
+        # without a separate positive holdout there is no independent check.
+        # Do not spend six generations and then persist a false VERIFIED book.
+        if selection_original_passed < _MIN_BASELINE_SUCCESSES or not holdout_quests:
+            validation_status = "NEEDS_BASELINE" if selection_original_passed < _MIN_BASELINE_SUCCESSES else "NEEDS_HOLDOUT"
+            rejection_reason = (
+                "baseline has no successful task" if validation_status == "NEEDS_BASELINE"
+                else "fewer than two successful historical tasks; independent holdout unavailable"
+            )
+            saved_path = save_compression_failure(
+                experiment_id, book, [],
+                {task_id: baseline_by_task.get(task_id) for task_id in baseline_by_task},
+                min_accept_ratio, output_dir, status=validation_status, rejection_reason=rejection_reason,
+            )
+            emit(
+                experiment_id, f"skill:{book.id}", _OPTIMIZER_CONFIG, "optimizer:npc",
+                "SKILL_REJECTED", reason="optimizer_validation_gate", skill_id=book.id,
+                validation_status=validation_status, original_passed=c["original_passed"],
+                n_tasks=total_tasks, n_candidates=0, min_accept_ratio=min_accept_ratio,
+            )
+            print(f"[optimizer]   BLOCCATA: {rejection_reason} -- autopsia -> {saved_path}")
+            results.append({
+                "skill_id": book.id, "accepted": False,
+                "validation_status": validation_status,
+                "original_passed": c["original_passed"], "n_tasks": total_tasks,
+                "best_candidate_passed": None, "holdout_passed": None,
+                "optimizer_tokens": 0,
+                "original_words": original_words, "best_candidate_words": None,
+                "n_candidates": 0, "n_qualifying": 0, "saved_path": str(saved_path),
+            })
+            continue
 
         attempts = []
         for i in range(1, n_candidates + 1):
+            event_start = len(read_events(experiment_id))
             compressed = compress_skill(experiment_id, book, adapter, candidate_index=i)
-            comp_results = verify_compressed(experiment_id, book, compressed, c["quests"], adapter, candidate_index=i)
+            comp_results = verify_compressed(experiment_id, book, compressed, selection_quests, adapter, candidate_index=i)
+            optimizer_tokens = _event_tokens(read_events(experiment_id)[event_start:])
             by_task = dict(comp_results)
             passed_n = sum(1 for _, p in comp_results if p)
             words = len(compressed.split())
-            attempts.append({"index": i, "text": compressed, "words": words, "by_task": by_task, "passed_n": passed_n})
-            print(f"[optimizer]   candidato {i}/{n_candidates}: {passed_n}/{n_tasks} passate, {words} parole")
+            compression_prompt_tokens = _compression_prompt_tokens(adapter, compressed)
+            attempts.append({
+                "index": i, "text": compressed, "words": words,
+                "compression_prompt_tokens": compression_prompt_tokens,
+                "optimizer_tokens": optimizer_tokens,
+                "by_task": by_task, "passed_n": passed_n,
+            })
+            token_label = f", {compression_prompt_tokens} token prompt" if compression_prompt_tokens is not None else ""
+            print(f"[optimizer]   candidato {i}/{n_candidates}: {passed_n}/{n_tasks} passate, {words} parole{token_label}")
 
         # 2026-08-19 fix (prompted by external review, found via a real check
         # against logged history, not a hypothetical): this used to require
@@ -293,15 +448,57 @@ def optimize(
         # +196 -- the biggest offender). "words < original_words" closes
         # that gap: a candidate that grows the procedure can still pass
         # verification, but can no longer be accepted AS a compression.
-        qualifying = [a for a in attempts if a["passed_n"] >= min_passed_needed and a["words"] < original_words]
+        def is_shorter(a: dict) -> bool:
+            # Words remain a readable sanity check, while the provider token
+            # count is the economic gate whenever it is available.
+            token_shorter = (
+                a["compression_prompt_tokens"] < original_prompt_tokens
+                if original_prompt_tokens is not None and a["compression_prompt_tokens"] is not None
+                else True
+            )
+            return a["words"] < original_words and token_shorter
+
+        qualifying = [a for a in attempts if a["passed_n"] >= min_passed_needed and is_shorter(a)]
         best = min(qualifying, key=lambda a: a["words"]) if qualifying else None
-        accepted = best is not None
+        holdout_results: list[tuple[str, bool]] = []
+        holdout_passed = None
+        holdout_required = ceil(min_accept_ratio * holdout_original_passed)
+        holdout_ok = False
+        holdout_optimizer_tokens = 0
+        if best is not None:
+            event_start = len(read_events(experiment_id))
+            holdout_results = verify_compressed(
+                experiment_id, book, best["text"], holdout_quests, adapter,
+                candidate_index=best["index"],
+            )
+            holdout_optimizer_tokens = _event_tokens(read_events(experiment_id)[event_start:])
+            holdout_passed = sum(1 for _, passed in holdout_results if passed)
+            best["by_task"].update(dict(holdout_results))
+            best["holdout_passed_n"] = holdout_passed
+            holdout_ok = holdout_passed >= holdout_required and holdout_passed > 0
+        # 2026-09-09: run only on `best`, after the holdout (same "one
+        # candidate actually being considered" scope) -- fail closed on
+        # UNPARSEABLE, never accept on a judgment that couldn't be read.
+        content_check = None
+        if best is not None:
+            content_check = check_content_preserved(book.procedure_text, best["text"], adapter)
+            best["content_check"] = content_check
+        content_preserved = content_check is not None and content_check["label"] == "PRESERVED"
+        accepted = best is not None and holdout_ok and content_preserved
 
         emit(
             experiment_id, f"skill:{book.id}", _OPTIMIZER_CONFIG, "optimizer:npc",
             "SKILL_ACCEPTED" if accepted else "SKILL_REJECTED", reason="optimize_skill",
             skill_id=book.id, original_passed=c["original_passed"], n_tasks=n_tasks,
             n_candidates=n_candidates, min_accept_ratio=min_accept_ratio,
+            validation_status="INDEPENDENT_HOLDOUT" if accepted else "HOLDOUT_FAILED",
+            selection_original_passed=selection_original_passed,
+            holdout_original_passed=holdout_original_passed,
+            holdout_required=holdout_required, holdout_passed=holdout_passed,
+            content_check_label=content_check["label"] if content_check else None,
+            content_check_reasoning=content_check["reasoning"] if content_check else None,
+            original_prompt_tokens=original_prompt_tokens,
+            optimizer_tokens=sum(a.get("optimizer_tokens", 0) for a in attempts) + holdout_optimizer_tokens,
             best_candidate_index=best["index"] if best else None,
             best_candidate_passed=best["passed_n"] if best else None,
             best_candidate_words=best["words"] if best else None,
@@ -309,29 +506,58 @@ def optimize(
         )
         saved_path = None
         if accepted:
-            saved_path = save_compressed_book(book, best["text"], output_dir)
+            saved_path = save_compressed_book(
+                book, best["text"], output_dir,
+                metadata={
+                    "validation_status": "INDEPENDENT_HOLDOUT",
+                    "content_check_label": content_check["label"] if content_check else None,
+                    "content_check_reasoning": content_check["reasoning"] if content_check else None,
+                    "original_prompt_tokens": original_prompt_tokens,
+                    "compressed_prompt_tokens": best.get("compression_prompt_tokens"),
+                    "optimizer_tokens": sum(a.get("optimizer_tokens", 0) for a in attempts) + holdout_optimizer_tokens,
+                },
+            )
             print(
                 f"[optimizer]   ACCETTATA: candidato {best['index']} ({best['passed_n']}/{n_tasks}, {best['words']}p, "
                 f"il piu' corto tra {len(qualifying)}/{n_candidates} validi) -> {saved_path}"
             )
         else:
             original_by_task = {
-                task_id: records_by_key.get((task_id, config_name))
-                for task_id, config_name in c["quests"]
+                task_id: baseline_by_task.get(task_id)
+                for task_id in baseline_by_task
             }
-            saved_path = save_compression_failure(experiment_id, book, attempts, original_by_task, min_accept_ratio)
+            # Three genuinely different failure modes (2026-09-09) -- a
+            # future "which patterns compress cleanly" study (this
+            # directory's own stated purpose) needs to tell them apart, not
+            # just see one generic rejection.
+            if best is not None and not holdout_ok:
+                failure_reason = f"holdout {holdout_passed or 0}/{holdout_required} non superato"
+            elif best is not None and not content_preserved:
+                label = content_check["label"] if content_check else "UNPARSEABLE"
+                detail = content_check["reasoning"] if content_check else "giudizio non disponibile"
+                failure_reason = f"contenuto perso nella compressione ({label}): {detail}"
+            else:
+                failure_reason = "nessun candidato supera la selezione e il risparmio di parole"
+            saved_path = save_compression_failure(
+                experiment_id, book, attempts, original_by_task, min_accept_ratio, output_dir,
+                status="REJECTED", rejection_reason=failure_reason,
+            )
             grew_but_passed = [a for a in attempts if a["passed_n"] >= min_passed_needed and a["words"] >= original_words]
             reason = (
                 f"{len(grew_but_passed)}/{n_candidates} passavano la verifica ma non erano piu' corti dell'originale ({original_words}p)"
                 if grew_but_passed
-                else f"nessuno dei {n_candidates} candidati raggiunge {min_accept_ratio:.0%} di {c['original_passed']}/{n_tasks}"
+                else f"nessuno dei {n_candidates} candidati raggiunge {min_accept_ratio:.0%} di "
+                     f"{selection_original_passed}/{n_tasks} nella selezione"
             )
             print(f"[optimizer]   RESPINTA: {reason} -- libreria invariata, autopsia -> {saved_path}")
 
         results.append({
             "skill_id": book.id, "accepted": accepted,
+            "validation_status": "INDEPENDENT_HOLDOUT" if accepted else "HOLDOUT_FAILED",
             "original_passed": c["original_passed"], "n_tasks": n_tasks,
             "best_candidate_passed": best["passed_n"] if best else None,
+            "holdout_passed": holdout_passed,
+            "optimizer_tokens": sum(a.get("optimizer_tokens", 0) for a in attempts) + holdout_optimizer_tokens,
             "original_words": original_words, "best_candidate_words": best["words"] if best else None,
             "n_candidates": n_candidates, "n_qualifying": len(qualifying),
             "saved_path": str(saved_path) if saved_path else None,

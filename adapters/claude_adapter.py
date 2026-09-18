@@ -26,7 +26,14 @@ class ClaudeAdapter(ModelAdapter):
         prompt: str,
         system: str | None = None,
         max_tokens: int = 1024,
+        thinking_budget: int | None = None,
     ) -> CompletionResult:
+        # thinking_budget: no equivalent knob wired here -- Claude's extended
+        # thinking is a different API shape (a separate `thinking` config
+        # block, not a token count on the existing call) not used by this
+        # project. Accepted and ignored so every caller in verification/ can
+        # pass it uniformly regardless of which adapter a role is configured
+        # to use (see adapters/base.py's own docstring for why it exists).
         start = time.monotonic()
         response = self.client.messages.create(
             model=self.model,

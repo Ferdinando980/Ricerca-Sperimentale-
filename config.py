@@ -39,6 +39,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
 GEMINI_VERTEX_MODEL = os.getenv("GEMINI_VERTEX_MODEL", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
 
+# Local Gemma via llama-server's OpenAI-compatible endpoint (llama.cpp, not
+# Ollama -- see adapters/gemma_adapter.py's own docstring). No API key: the
+# server runs on this machine. Defaults match the exact invocation already
+# proven working for the Archivist benchmark (2026-09-15,
+# Ai/start-gemma-benchmark.ps1) -- start that script (or an equivalent
+# llama-server) before using this provider, this module does not launch it.
+GEMMA_BASE_URL = os.getenv("GEMMA_BASE_URL", "http://127.0.0.1:8080/v1")
+GEMMA_MODEL = os.getenv("GEMMA_MODEL", "gemma-4-12B-Q4_K_M.gguf")
+
 # gemini_vertex auth: project + region, both required; the service account key
 # itself is never read here -- GOOGLE_APPLICATION_CREDENTIALS (set in .env like
 # any other var here) is picked up straight from the process environment by

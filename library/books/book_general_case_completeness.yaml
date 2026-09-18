@@ -1,0 +1,57 @@
+id: book_general_case_completeness
+version: 1
+title: Concept and case-completeness check before writing a fix
+domain: programming
+problem_tags:
+- multi-case-definition
+- incomplete-fix
+capability_tags:
+- case-completeness
+- concept-recognition
+resource_tags:
+- python
+pattern_id: general_case_completeness
+canonical_problem_id: ""
+status: VERIFIED
+confidence: 1.0
+verification_count: 1
+verification_types:
+- manual_verification_2026-09-17
+procedure_text: >
+  Symptom: a generated fix only handles the case the buggy code already
+  exhibited and silently fails on other real inputs -- the bug pattern that
+  first surfaces this may look narrow (a truncated number, an off-by-one, a
+  wrong operator) but the deeper cause is a hidden case the fix never
+  considered.
+
+
+  1. Name the concept: does this function compute something with a standard,
+  well-known name or definition (e.g. median, average, GCD, leap year,
+  checksum, palindrome, rounding, pagination)? State it explicitly.
+
+  2. Recall the FULL definition, not just the part the buggy code already
+  handles: many standard definitions have multiple cases built in BY
+  CONVENTION, not as an edge case to discover later (e.g. the median of a
+  list is defined differently for an odd vs even count of elements -- this
+  is the textbook definition itself, not a special case). List every case
+  the real definition requires.
+
+  3. Index each case, solve it independently: for every case from step 2,
+  work out on its own what the correct result should be for that case
+  alone, from first principles -- do not adapt one case's logic to fit
+  another.
+
+  4. Merge: combine the independent per-case solutions into one function
+  that dispatches correctly to whichever case actually occurs.
+
+  5. Stress-test mentally before finalizing: run the merged function, in
+  your head, against one small concrete example per case listed in step 2
+  -- not just the case the original buggy code already seemed to handle. If
+  any case gives a wrong answer, the fix is incomplete -- revise it, don't
+  ship it.
+
+  6. If the definition genuinely has only one case, say so explicitly
+  instead of inventing branches that are not part of the real definition --
+  this is a check, not a mandate to add complexity.
+derived_from: null
+generation_method: manual

@@ -74,9 +74,13 @@ class GeminiAdapter(ModelAdapter):
         prompt: str,
         system: str | None = None,
         max_tokens: int = 1024,
+        thinking_budget: int | None = None,
     ) -> CompletionResult:
         start = time.monotonic()
         full_prompt = f"{system}\n\n{prompt}" if system else prompt
+        generation_config: dict = {"max_output_tokens": max_tokens}
+        if thinking_budget is not None:
+            generation_config["thinking_config"] = {"thinking_budget": thinking_budget}
 
         attempt = 0
         paused_seconds = 0.0
@@ -100,7 +104,7 @@ class GeminiAdapter(ModelAdapter):
                 response = self._clients[idx].models.generate_content(
                     model=self.model,
                     contents=full_prompt,
-                    config={"max_output_tokens": max_tokens},
+                    config=generation_config,
                 )
                 break
             except genai_errors.APIError as e:

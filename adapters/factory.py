@@ -5,6 +5,7 @@ from ..providers import PROVIDERS
 from .base import ModelAdapter
 from .claude_adapter import ClaudeAdapter
 from .gemini_adapter import GeminiAdapter, GeminiVertexAdapter
+from .gemma_adapter import GemmaAdapter
 from .mock_adapter import MockAdapter
 from .openai_adapter import OpenAIAdapter
 
@@ -13,6 +14,7 @@ _ADAPTER_CLASSES = {
     "gemini": GeminiAdapter,
     "gemini_vertex": GeminiVertexAdapter,
     "openai": OpenAIAdapter,
+    "gemma": GemmaAdapter,
 }
 
 

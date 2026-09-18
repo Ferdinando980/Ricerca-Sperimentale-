@@ -1,0 +1,52 @@
+id: book_wrong_comparison_operator_v2_v3_v4_v5
+version: 5
+title: Finding wrong-comparison-operator bugs (compressed) (compressed) (compressed)
+  (method-repaired)
+domain: programming
+problem_tags:
+- wrong-output
+- boundary-included-incorrectly
+capability_tags:
+- comparison-operator
+- boundary-condition
+resource_tags:
+- python
+pattern_id: wrong_comparison_operator
+canonical_problem_id: merge_intervals
+status: VERIFIED
+confidence: 1.0
+verification_count: 5
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-differentiate-boundary-patterns
+- self_compression_reverify
+- method_repair_reverify
+procedure_text: "Symptom: Item on boundary/equal to neighbor takes wrong branch. \n\
+  \n1. Identify comparisons guarding branches (exclude loop ranges).\n2. Scan the\
+  \ docstring, comments, and spec text for concrete observable signals:\n   a. Look\
+  \ for arithmetic modification words applied to the compared variables (e.g., \"\
+  added\", \"overhead\", \"offset\", \"margin\", \"deducted\", \"plus\", \"minus\"\
+  , \"+\", \"-\").\n   b. Look for exact boundary keywords (e.g., \"at most\", \"\
+  no more than\", \"up to\", \"strictly less than\", \"below\", \"exceeds\", \"strictly\
+  \ greater than\", \"at least\", \"no less than\", \"equal to\", \"matches\").\n\
+  3. Apply the mechanical mapping:\n   - IF the spec/docstring specifies an arithmetic\
+  \ modification on an operand (e.g., \"overhead added\") that is missing from the\
+  \ comparison expression: DO NOT flip the comparison operator; update the operand\
+  \ expression with the missing arithmetic instead (e.g., `operand + offset`).\n \
+  \  - IF the operands match the spec and boundary keywords are present:\n     * \"\
+  at most\" / \"no more than\" / \"up to\" / \"less than or equal\" -> use `<=`\n\
+  \     * \"strictly less\" / \"less than\" / \"below\" / \"under\" -> use `<`\n \
+  \    * \"at least\" / \"no less than\" / \"greater than or equal\" -> use `>=`\n\
+  \     * \"strictly greater\" / \"more than\" / \"exceeds\" / \"above\" -> use `>`\n\
+  \     * \"equal to\" / \"exactly\" / \"matches\" -> use `==`\n     * \"not equal\
+  \ to\" / \"different from\" -> use `!=`\n     Flip the operator (`<`↔`<=`, `>`↔`>=`,\
+  \ or `==`↔`!=`) ONLY if the current operator contradicts this keyword mapping.\n\
+  \   - IF NO explicit boundary keyword or arithmetic modification is present in the\
+  \ spec, docstring, or comments: DO NOT flip the operator; leave the operator unchanged\
+  \ and add a comment flagging the ambiguity: `# UNVERIFIED BOUNDARY: confirm whether\
+  \ boundary condition requires strict/inclusive comparison or operand adjustment`.\n\
+  4. Verify using input with adjacent equal values."
+derived_from: book_wrong_comparison_operator_v2_v3_v4
+generation_method: method_repair

@@ -31,6 +31,16 @@ MARKER_END = "<!-- AUTO:RISULTATI:END -->"
 
 README_PATH = Path(__file__).resolve().parent.parent / "README.md"
 
+# THESIS.md (top-level, sibling of cognitive_rpg/ and Jarvis/) mirrors the
+# same results table under its own markers -- added 2026-09-16 so the
+# Ricerca+Aria narrative document never drifts from the numbers in
+# README.md the way README.md itself used to drift before this script
+# existed. Same body, different markers, so the two files can each keep
+# their own surrounding prose untouched.
+THESIS_PATH = Path(__file__).resolve().parent.parent.parent / "THESIS.md"
+THESIS_MARKER_START = "<!-- AUTO:THESIS-RISULTATI:START -->"
+THESIS_MARKER_END = "<!-- AUTO:THESIS-RISULTATI:END -->"
+
 # Fixed historical fact, not a per-run number -- describes something that
 # already happened once (the README used to claim no benefit, based on a run
 # smaller and older than any tracked here) and doesn't need to regenerate.
@@ -172,12 +182,12 @@ def _cost_paragraph(runs: list[dict]) -> str:
     )
 
 
-def build_section() -> str:
+def build_section(marker_start: str = MARKER_START, marker_end: str = MARKER_END) -> str:
     ids = _discover_experiment_ids()
     runs = [s for s in (_run_summary(i) for i in ids) if s]
     if not runs:
         return (
-            f"{MARKER_START}\n## Cosa mostrano i run completi\n\nNessun run completo ancora nei log.\n{MARKER_END}"
+            f"{marker_start}\nNessun run completo ancora nei log.\n{marker_end}"
         )
     body = "\n\n".join([
         "## Cosa mostrano i run completi",
@@ -194,28 +204,49 @@ def build_section() -> str:
         _limits_paragraph(runs),
         _cost_paragraph(runs),
     ])
-    return f"{MARKER_START}\n{body}\n{MARKER_END}"
+    return f"{marker_start}\n{body}\n{marker_end}"
+
+
+def _substitute(path: Path, marker_start: str, marker_end: str, section: str, label: str) -> bool:
+    """Returns True if `path` changed."""
+    text = path.read_text(encoding="utf-8")
+    if marker_start not in text or marker_end not in text:
+        raise RuntimeError(
+            f"{label} is missing {marker_start}/{marker_end} markers -- "
+            "add them around the results section once, by hand, before this can auto-update it."
+        )
+    pattern = re.compile(re.escape(marker_start) + r".*?" + re.escape(marker_end), re.DOTALL)
+    new_text = pattern.sub(lambda _m: section, text, count=1)
+    changed = new_text != text
+    if changed:
+        path.write_text(new_text, encoding="utf-8")
+    return changed
 
 
 def update_readme() -> bool:
     """Returns True if README.md changed."""
-    text = README_PATH.read_text(encoding="utf-8")
-    if MARKER_START not in text or MARKER_END not in text:
-        raise RuntimeError(
-            f"README.md is missing {MARKER_START}/{MARKER_END} markers -- "
-            "add them around the results section once, by hand, before this can auto-update it."
-        )
-    pattern = re.compile(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), re.DOTALL)
-    new_text = pattern.sub(lambda _m: build_section(), text, count=1)
-    changed = new_text != text
-    if changed:
-        README_PATH.write_text(new_text, encoding="utf-8")
-    return changed
+    return _substitute(README_PATH, MARKER_START, MARKER_END, build_section(), "README.md")
+
+
+def update_thesis() -> bool:
+    """Returns True if THESIS.md changed. Same numbers as README.md, own markers
+    (THESIS.md keeps a table-only body without the '## Cosa mostrano...' heading,
+    since that heading already exists as prose around the markers there)."""
+    if not THESIS_PATH.exists():
+        return False
+    section = build_section(THESIS_MARKER_START, THESIS_MARKER_END)
+    # Strip the "## Cosa mostrano i run completi" heading + the "Due limiti veri"
+    # lead-in line that only make sense as README.md's own section title --
+    # THESIS.md already has its own heading and prose around the markers.
+    section = section.replace("## Cosa mostrano i run completi\n\n", "", 1)
+    return _substitute(THESIS_PATH, THESIS_MARKER_START, THESIS_MARKER_END, section, "THESIS.md")
 
 
 def main() -> int:
-    changed = update_readme()
-    print(f"[readme_update] {'README.md aggiornato.' if changed else 'README.md già allineato ai log, nessuna modifica.'}")
+    readme_changed = update_readme()
+    thesis_changed = update_thesis()
+    print(f"[readme_update] README.md {'aggiornato' if readme_changed else 'già allineato ai log'}.")
+    print(f"[readme_update] THESIS.md {'aggiornato' if thesis_changed else 'già allineato ai log (o assente)'}.")
     return 0
 
 

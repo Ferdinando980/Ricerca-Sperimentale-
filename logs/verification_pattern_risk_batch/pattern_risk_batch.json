@@ -1,0 +1,58 @@
+[
+  {
+    "pattern_id": "index_out_of_range_boundary",
+    "book_id": "book_index_out_of_range_boundary_v2_v3_v4",
+    "axis": "NONE_APPLICABLE",
+    "verdict": "NOT_TESTED",
+    "detail": "nessun valore letterale ne' metodo fisso condizionato identificato -- nessuno dei due assi si applica a questa skill (non equivale a 'sicura', solo a 'non misurabile con questi due test')"
+  },
+  {
+    "pattern_id": "integer_division_truncation",
+    "book_id": "book_integer_division_truncation_v2_v3_v4",
+    "axis": "METHOD_TRAP",
+    "verdict": "HIGH_RISK",
+    "detail": "3/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 0 non conclusivi"
+  },
+  {
+    "pattern_id": "inverted_boolean_logic",
+    "book_id": "book_inverted_boolean_logic_v2_v3",
+    "axis": "NONE_APPLICABLE",
+    "verdict": "NOT_TESTED",
+    "detail": "nessun valore letterale ne' metodo fisso condizionato identificato -- nessuno dei due assi si applica a questa skill (non equivale a 'sicura', solo a 'non misurabile con questi due test')"
+  },
+  {
+    "pattern_id": "key_error_missing_dict_check",
+    "book_id": "book_key_error_missing_dict_check_v2",
+    "axis": "NUMERIC_RULE",
+    "verdict": "GENERALIZES",
+    "detail": "Response A uses 0 for additive identity while Response B uses 1 for multiplicative identity as required."
+  },
+  {
+    "pattern_id": "off_by_one",
+    "book_id": "book_off_by_one_v2_v3_v4",
+    "axis": "METHOD_TRAP",
+    "verdict": "LOW_RISK",
+    "detail": "0/3 scenari con applicazione meccanica reale (verificata per esecuzione), 2 evitati, 1 non conclusivi"
+  },
+  {
+    "pattern_id": "wrong_accumulator_init",
+    "book_id": "book_wrong_accumulator_init_v2_v3_v4",
+    "axis": "NONE_APPLICABLE",
+    "verdict": "NOT_TESTED",
+    "detail": "nessun valore letterale ne' metodo fisso condizionato identificato -- nessuno dei due assi si applica a questa skill (non equivale a 'sicura', solo a 'non misurabile con questi due test')"
+  },
+  {
+    "pattern_id": "wrong_comparison_operator",
+    "book_id": "book_wrong_comparison_operator_v2_v3_v4",
+    "axis": "METHOD_TRAP",
+    "verdict": "HIGH_RISK",
+    "detail": "3/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 0 non conclusivi"
+  },
+  {
+    "pattern_id": "wrong_string_case_comparison",
+    "book_id": "book_wrong_string_case_comparison_v2",
+    "axis": "METHOD_TRAP",
+    "verdict": "HIGH_RISK",
+    "detail": "1/3 scenari con applicazione meccanica reale (verificata per esecuzione), 0 evitati, 2 non conclusivi"
+  }
+]

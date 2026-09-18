@@ -22,7 +22,11 @@ class MockAdapter(ModelAdapter):
         prompt: str,
         system: str | None = None,
         max_tokens: int = 1024,
+        thinking_budget: int | None = None,
     ) -> CompletionResult:
+        # thinking_budget: no real call happens here, nothing to configure.
+        # Accepted and ignored for interface compatibility (see adapters/
+        # base.py's docstring).
         start = time.monotonic()
         text = self.canned_response if self.canned_response is not None else "# mock: no fix applied\n"
         latency_ms = (time.monotonic() - start) * 1000

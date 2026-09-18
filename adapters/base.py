@@ -41,7 +41,32 @@ class ModelAdapter(ABC):
         prompt: str,
         system: str | None = None,
         max_tokens: int = 1024,
+        thinking_budget: int | None = None,
     ) -> CompletionResult:
+        """thinking_budget: None (default) leaves a reasoning-capable model's
+        extended thinking dynamic/unbounded, as before -- unchanged behavior
+        for every existing caller. A caller that ONLY needs a fixed-shape
+        classification (a JSON verdict, not open-ended problem solving) can
+        pass a small value (e.g. 0) to make the answer-token budget
+        deterministic instead of variable-per-topic.
+
+        Real bug this fixes (2026-09-18): identify_slot_decomposed's classify
+        step asked gemini-3.6-flash to classify the literal 'None' -- and the
+        model spent enough invisible reasoning tokens on that one specific
+        candidate (not on '[]', not on other literals) to blow through
+        max_tokens=1024 before writing the JSON verdict, 5/5 repeated runs.
+        The early-return-on-first-match loop in identify_slot_decomposed then
+        silently fell through to the NEXT candidate, so the bug looked like
+        "the model disagrees on which slot is real" when it was actually a
+        token-budget truncation on ONE specific candidate, invisible without
+        isolating extract vs. classify (see verification/slot_identifier.py's
+        own comment on _CLASSIFY_LITERAL_SYSTEM_PROMPT call sites). Providers
+        without an equivalent knob (Claude's extended thinking is a different
+        API shape not used here; OpenAI/Gemma have no matching parameter;
+        Gemma's local server already runs with --reasoning off at the process
+        level) accept and ignore this argument rather than erroring, so every
+        call site can pass it uniformly regardless of which adapter is
+        configured for a role."""
         raise NotImplementedError
 
     @abstractmethod

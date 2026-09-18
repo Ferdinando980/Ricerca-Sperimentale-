@@ -1,0 +1,35 @@
+id: book_mutable_default_argument_v2_v3_v4_v5
+version: 5
+title: Finding mutable-default-argument bugs (compressed) (compressed) (compressed)
+  (substitution-repaired)
+domain: programming
+problem_tags:
+- state-leaks-across-calls
+- wrong-output-on-repeat-call
+capability_tags:
+- mutable-default-argument
+- python-gotcha
+resource_tags:
+- python
+pattern_id: mutable_default_argument
+canonical_problem_id: dedupe_preserve_order
+status: VERIFIED
+confidence: 1.0
+verification_count: 5
+verification_types:
+- external
+- self_compression_reverify
+- self_compression_reverify
+- self_compression_reverify
+- substitution_repair_reverify
+procedure_text: "Symptom: Function returns accumulated results on subsequent calls.\n\
+  \n1. Check for mutable default arguments.\n2. Determine replacement sentinel value:\n\
+  \   - If the situation states an explicit sentinel or default value in the specification\
+  \ or docstring, use exactly that.\n   - Else, if `None` is a valid domain input\
+  \ distinct from \"not passed\" (observable signal: function logic checks `val is\
+  \ None` as a meaningful value or `None` is an accepted payload), use a unique sentinel\
+  \ instance `_SENTINEL = object()`.\n   - Else, do not guess: use `None` as the standard\
+  \ Python language-level fallback sentinel for mutable defaults.\n3. Initialize:\
+  \ val = [] if val is None else val.\n4. Verify with multi-call tests."
+derived_from: book_mutable_default_argument_v2_v3_v4
+generation_method: substitution_repair

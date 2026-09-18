@@ -13,9 +13,12 @@ Provider/model per role is controlled by EXPERT_PROVIDER / SMALL_PROVIDER in .en
 run `python -m cognitive_rpg.settings_wizard` to set them interactively.
 """
 
+import os
 import sys
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
 from .. import config
@@ -25,6 +28,17 @@ from ..city.report import generate as generate_city_report
 from ..domain.task_generator import generate_tasks
 from .experiment_log import archive, read_all
 from .quest_runner import run_quest
+
+
+def _report_quota_stop(e: QuotaExhaustedError, done: int, total_calls: int) -> bool:
+    retry_at = datetime.now(timezone.utc).astimezone() + timedelta(seconds=e.retry_after_seconds)
+    print(
+        f"\n[experiment_0] {e} -- fermato dopo {done}/{total_calls} quest "
+        f"(tutto il reale fatto finora e' salvato). Riprova non prima delle "
+        f"{retry_at:%H:%M %Z}. Rilancia lo stesso comando per riprendere da qui.",
+        file=sys.stderr,
+    )
+    return True
 
 
 def main():
@@ -53,32 +67,66 @@ def main():
 
     total_calls = len(tasks) * 4
     done = len(already_done)
-    stopped_early = False
-    for task in tasks:
-        if stopped_early:
-            break
+
+    quest_specs = [
+        (task, config_name, adapter, use_librarian, use_cheater)
+        for task in tasks
         for config_name, adapter, use_librarian, use_cheater in (
             ("A", expert_adapter, False, False),
             ("B", small_adapter, False, False),
             ("F", small_adapter, True, False),
             ("C", small_adapter, False, True),  # Cheater: Small + Solution Bank
-        ):
-            if (task.task_id, config_name) in already_done:
-                continue
+        )
+        if (task.task_id, config_name) not in already_done
+    ]
+
+    # PARALLEL_QUESTS (opt-in, default 1 = comportamento sequenziale
+    # originale, invariato) -- ogni quest resta indipendente (task/config
+    # diversi non condividono stato, run_quest scrive il proprio record da
+    # solo), quindi lanciarne piu' d'una insieme e' sicuro. Aggiunto
+    # 2026-09-17 dopo che i tempi reali di un run hanno mostrato Gemma
+    # (locale) come il collo di bottiglia dominante, non le chiamate di rete
+    # a Gemini -- va abbinato a un llama-server lanciato con --parallel > 1,
+    # altrimenti le richieste si accodano comunque lato server.
+    try:
+        parallel = max(1, int(os.getenv("PARALLEL_QUESTS", "1")))
+    except ValueError:
+        parallel = 1
+
+    stopped_early = False
+    if parallel <= 1:
+        for task, config_name, adapter, use_librarian, use_cheater in quest_specs:
+            if stopped_early:
+                break
             try:
                 run_quest(task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater)
             except QuotaExhaustedError as e:
-                retry_at = datetime.now(timezone.utc).astimezone() + timedelta(seconds=e.retry_after_seconds)
-                print(
-                    f"\n[experiment_0] {e} -- fermato dopo {done}/{total_calls} quest "
-                    f"(tutto il reale fatto finora e' salvato). Riprova non prima delle "
-                    f"{retry_at:%H:%M %Z}. Rilancia lo stesso comando per riprendere da qui.",
-                    file=sys.stderr,
-                )
-                stopped_early = True
+                stopped_early = _report_quota_stop(e, done, total_calls)
                 break
             done += 1
             print(f"[experiment_0] {done}/{total_calls} quests run ({task.task_id})", file=sys.stderr)
+    else:
+        print(f"[experiment_0] modalita' parallela: {parallel} quest concorrenti", file=sys.stderr)
+        done_lock = threading.Lock()
+        quota_error: list[QuotaExhaustedError] = []
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            futures = {
+                pool.submit(run_quest, task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater): (task, config_name)
+                for task, config_name, adapter, use_librarian, use_cheater in quest_specs
+            }
+            for future in as_completed(futures):
+                task, config_name = futures[future]
+                try:
+                    future.result()
+                except QuotaExhaustedError as e:
+                    quota_error.append(e)
+                    continue
+                with done_lock:
+                    done += 1
+                    local_done = done
+                print(f"[experiment_0] {local_done}/{total_calls} quests run ({task.task_id}::{config_name})", file=sys.stderr)
+        if quota_error:
+            stopped_early = _report_quota_stop(quota_error[0], done, total_calls)
 
     summarize(experiment_id)
 

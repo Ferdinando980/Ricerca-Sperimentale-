@@ -5,3 +5,4 @@ __pycache__/
 *.key
 *.pem
 credentials.json
+library/_repair_scratch/

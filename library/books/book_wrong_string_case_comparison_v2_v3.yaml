@@ -1,0 +1,40 @@
+id: book_wrong_string_case_comparison_v2_v3
+version: 3
+title: Fixing wrong string case comparison bugs (compressed) (method-repaired)
+domain: programming
+problem_tags:
+- wrong-output
+- runtime-bug
+capability_tags:
+- case-sensitivity
+- string-comparison
+resource_tags:
+- python
+pattern_id: wrong_string_case_comparison
+canonical_problem_id: find_matching_tag
+status: VERIFIED
+confidence: 1.0
+verification_count: 3
+verification_types:
+- skill_generator_initial_verification
+- self_compression_reverify
+- method_repair_reverify
+procedure_text: 'Symptom: String equality/membership tests fail on case differences
+  (e.g., "Tag" vs "tag").
+
+
+  1. Explicitly check whether the domain logic semantically requires case-insensitive
+  equality or membership rather than case-sensitive matching or handling other string
+  mismatches like whitespace or Unicode normalization. If this condition does not
+  hold, recognize that the method does not apply here and look for a different fix.
+
+  2. Store normalized query: `q_norm = query.casefold()`.
+
+  3. Normalize targets: `if target.casefold() == q_norm:`.
+
+  4. For collections, transform elements or use a dictionary mapping (`{val.casefold():
+  val}`) for lookups.
+
+  5. Ensure returned values remain original (non-normalized) unless otherwise required.'
+derived_from: book_wrong_string_case_comparison_v2
+generation_method: method_repair

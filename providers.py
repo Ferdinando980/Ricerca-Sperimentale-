@@ -62,6 +62,15 @@ PROVIDERS: dict[str, Provider] = {
         pricing_input_env="OPENAI_INPUT_PER_MTOK",
         pricing_output_env="OPENAI_OUTPUT_PER_MTOK",
     ),
+    "gemma": Provider(
+        key="gemma",
+        label="Gemma locale (llama-server su 127.0.0.1:8080, nessuna key -- avviare prima Ai/start-gemma-benchmark.ps1)",
+        api_key_env=None,
+        default_model="gemma-4-12B-Q4_K_M.gguf",
+        model_env="GEMMA_MODEL",
+        pricing_input_env=None,  # hardware locale, sempre $0
+        pricing_output_env=None,
+    ),
     "mock": Provider(
         key="mock",
         label="Mock (nessuna chiamata reale, costo $0, per test)",
@@ -73,4 +82,4 @@ PROVIDERS: dict[str, Provider] = {
     ),
 }
 
-PROVIDER_ORDER = ["claude", "gemini", "gemini_vertex", "openai", "mock"]
+PROVIDER_ORDER = ["claude", "gemini", "gemini_vertex", "openai", "gemma", "mock"]
