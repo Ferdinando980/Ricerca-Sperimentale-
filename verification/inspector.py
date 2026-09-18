@@ -190,6 +190,7 @@ def run_repair_loop(
     verdicts: list[InspectorVerdict] = []
     prior_feedback: str | None = None
     reuse_candidate_text: str | None = None
+    just_reused = False
     result = None
     for attempt_n in range(1, max_attempts + 1):
         result = repair_fn(**repair_kwargs, prior_feedback=prior_feedback, reuse_candidate_text=reuse_candidate_text)
@@ -198,14 +199,27 @@ def run_repair_loop(
         _log_attempt(experiment_id, pattern_id, attempt_n, verdict, result)
         if verdict.status == "SOLID":
             break
-        if verdict.responsible == "verification_infrastructure":
+        # Riuso al massimo UNA volta di fila (2026-09-18, bug reale trovato
+        # dal vivo): se anche la verifica riprovata sullo STESSO testo torna
+        # 'infrastruttura', il sospetto cambia -- non e' detto sia solo il
+        # verificatore instabile, potrebbe essere il testo stesso a essere
+        # troppo incoerente da verificare (visto dal vivo: una riscrittura
+        # troncata/con ragionamento trapelato non e' che fa fallire la
+        # rigenerazione degli scenari per sfortuna, la fa fallire perche' non
+        # descrive piu' un metodo leggibile). Ririprovare all'infinito sullo
+        # stesso testo sospetto spreca l'intero budget di tentativi su un
+        # candidato che andava comunque scartato -- dopo un solo riuso, forza
+        # una rigenerazione fresca indipendentemente dal verdetto.
+        if verdict.responsible == "verification_infrastructure" and not just_reused:
             # Il candidato non e' mai stato davvero giudicato -- ririprovare
             # SOLO la verifica sullo stesso testo, non chiederne uno nuovo
             # (vedi judge_repair_result: rigenerare non risolve un verificatore
             # instabile, e spreca una chiamata Expert su un rifacimento inutile).
             reuse_candidate_text = getattr(result, "candidate_text", None)
             prior_feedback = None
+            just_reused = True
         else:
             reuse_candidate_text = None
             prior_feedback = verdict.feedback_for_regeneration
+            just_reused = False
     return result, verdicts

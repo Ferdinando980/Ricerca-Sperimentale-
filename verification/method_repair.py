@@ -87,10 +87,17 @@ _REPAIR_SYSTEM_PROMPT = (
     "new variable/placeholder even though that variable is needed to also "
     "cover rarer cases. Losing concreteness on the common case to gain "
     "generality for a rare one is exactly the kind of regression to avoid.\n\n"
-    "Keep every other instruction, case, and constraint in the procedure exactly "
-    "as it is -- do not shorten, summarize, or drop anything unrelated to the "
-    "flagged step. Return ONLY the full rewritten procedure text, no preamble, "
-    "no code fences."
+    "Before writing your final answer, silently (in your own reasoning, "
+    "never in the visible output) list every numbered step/instruction in "
+    "the original procedure OTHER than the one you are decomposing, and for "
+    "each one confirm it still appears in your rewritten version, in "
+    "substance and in the same relative position -- if any is missing, add "
+    "it back before finalizing. 'Keep everything else the same' has failed "
+    "silently before when treated as a vague reminder instead of an "
+    "explicit per-step check like this one.\n\n"
+    "Your visible output must contain ONLY the full rewritten procedure "
+    "text -- no preamble, no code fences, no meta-commentary about your own "
+    "process, and not one word of the checklist above."
 )
 
 
@@ -169,7 +176,13 @@ def repair_method_skill(
         candidate_text = reuse_candidate_text
     else:
         prompt = _build_repair_prompt(book, method, original.n_mechanical, original.n_scenarios, example, prior_feedback)
-        completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=2048)
+        # 4096, not 2048: same reasoning-model truncation bug documented
+        # elsewhere in this project (worker.py, make_extractor) -- the new
+        # explicit self-check instruction in _REPAIR_SYSTEM_PROMPT (2026-09-
+        # 18) gives a reasoning-capable Expert more to think through before
+        # the final text, and 2048 was caught live truncating the rewrite
+        # mid-sentence with leaked reasoning fragments in the output.
+        completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=4096)
         candidate_text = completion.text.strip()
         if not candidate_text:
             return MethodRepairResult(accepted=False, reason="riscrittura vuota", original_mechanical_ratio=original_ratio)

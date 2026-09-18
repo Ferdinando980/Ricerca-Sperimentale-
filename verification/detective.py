@@ -67,9 +67,12 @@ class DetectiveHypothesis:
     cases: list[str]
     case_questions: dict[str, str]
     supported_case: str | None  # None means INCONCLUSIVE
-    evidence_quote: str | None
+    evidence_quote: str | None  # None when resolved BY ELIMINATION (see by_elimination) -- a
+    # fallback case has no positive marker to quote, so its "evidence" is that
+    # every other case was explicitly ruled out, not a quote about itself.
     all_verdicts: dict[str, str | None]  # case -> evidence quote or None (transparency/logging)
     status: str  # RESOLVED | INCONCLUSIVE
+    by_elimination: bool = False
 
 
 _EXTRACT_CASES_SYSTEM_PROMPT = (
@@ -143,44 +146,73 @@ def _generate_question(book: Book, case: str, adapter: ModelAdapter) -> str | No
     return question if isinstance(question, str) and question.strip() else None
 
 
-def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> str | None:
-    """Returns the verbatim evidence quote if the question is answered YES
-    with real, checkable support -- None otherwise (no, or unparseable, or a
-    hallucinated quote not actually in the task's text)."""
+def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> dict:
+    """Tri-state, not binary -- 2026-09-18 fix for a real wrinkle found live:
+    a FALLBACK case ('neither a nor b applies') has no positive textual
+    marker to quote, so demanding a verbatim quote to confirm it degenerated
+    to quoting the whole task, technically verbatim but not informative.
+    Returns {"verdict": "YES"|"NO"|"UNKNOWN", "quote": str|None} -- YES needs
+    a real verbatim quote (same fail-closed bar as everywhere else in this
+    package); NO is an explicit, confirmed exclusion; UNKNOWN covers every
+    unparseable/hallucinated-quote case, deliberately kept SEPARATE from NO
+    -- inferring a fallback case by elimination (see _investigate_once) is
+    only sound when every OTHER case was actually ruled out, not when we
+    simply failed to get a clean answer for one of them."""
     prompt = f"Task:\n\n{_task_text(task)}\n\nQuestion: {question}"
     completion = adapter.complete(prompt=prompt, system=_ANSWER_QUESTION_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
-        return None
+        return {"verdict": "UNKNOWN", "quote": None}
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError:
-        return None
-    if data.get("answer") is not True:
-        return None
+        return {"verdict": "UNKNOWN", "quote": None}
+    answer = data.get("answer")
+    if answer is False:
+        return {"verdict": "NO", "quote": None}
+    if answer is not True:
+        return {"verdict": "UNKNOWN", "quote": None}
     quote = data.get("evidence_quote")
     if not isinstance(quote, str) or not quote.strip():
-        return None
-    task_text = _task_text(task)
-    if quote not in task_text:
+        return {"verdict": "UNKNOWN", "quote": None}
+    if quote not in _task_text(task):
         # Citazione allucinata -- non recuperabile, stesso principio
         # verbatim di ogni altro identify_*/extract_* in questo package.
-        return None
-    return quote
+        return {"verdict": "UNKNOWN", "quote": None}
+    return {"verdict": "YES", "quote": quote}
 
 
 def _investigate_once(book: Book, task: Task, cases: list[str], case_questions: dict[str, str], adapter: ModelAdapter) -> dict:
     all_verdicts: dict[str, str | None] = {}
+    raw: dict[str, dict] = {}
     for case in cases:
         question = case_questions.get(case)
         if question is None:
+            raw[case] = {"verdict": "UNKNOWN", "quote": None}
             all_verdicts[case] = None
             continue
-        all_verdicts[case] = _answer_question(task, question, adapter)
-    supported = [c for c, q in all_verdicts.items() if q is not None]
+        raw[case] = _answer_question(task, question, adapter)
+        all_verdicts[case] = raw[case]["quote"]
+
+    supported = [c for c, r in raw.items() if r["verdict"] == "YES"]
     if len(supported) == 1:
-        return {"status": "RESOLVED", "supported_case": supported[0], "evidence_quote": all_verdicts[supported[0]], "all_verdicts": all_verdicts}
-    return {"status": "INCONCLUSIVE", "supported_case": None, "evidence_quote": None, "all_verdicts": all_verdicts}
+        return {"status": "RESOLVED", "supported_case": supported[0], "evidence_quote": raw[supported[0]]["quote"],
+                "all_verdicts": all_verdicts, "by_elimination": False}
+
+    if len(supported) == 0:
+        # Nessun caso ha evidenza positiva diretta -- possibile solo per
+        # ELIMINAZIONE se OGNI altro caso e' stato esplicitamente escluso
+        # (NO confermato, non solo "non determinato"). Un caso di fallback
+        # ("nessuno dei due si applica") tipicamente finisce qui: non ha un
+        # marcatore positivo da citare, ma e' comunque una conclusione solida
+        # se tutte le alternative sono state davvero escluse una per una.
+        ruled_out = [c for c, r in raw.items() if r["verdict"] == "NO"]
+        remaining = [c for c in cases if c not in ruled_out]
+        if len(remaining) == 1 and len(ruled_out) == len(cases) - 1:
+            return {"status": "RESOLVED", "supported_case": remaining[0], "evidence_quote": None,
+                    "all_verdicts": all_verdicts, "by_elimination": True}
+
+    return {"status": "INCONCLUSIVE", "supported_case": None, "evidence_quote": None, "all_verdicts": all_verdicts, "by_elimination": False}
 
 
 def investigate(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 3) -> DetectiveHypothesis | None:
@@ -209,5 +241,5 @@ def investigate(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 
     return DetectiveHypothesis(
         book_id=book.id, task_id=task.task_id, cases=cases, case_questions=case_questions,
         supported_case=voted["supported_case"], evidence_quote=voted["evidence_quote"],
-        all_verdicts=voted["all_verdicts"], status=voted["status"],
+        all_verdicts=voted["all_verdicts"], status=voted["status"], by_elimination=voted.get("by_elimination", False),
     )
