@@ -33,6 +33,7 @@ Each event carries:
 
 import json
 import re
+import threading
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -66,6 +67,18 @@ def events_path(experiment_id: str) -> Path:
     return config.experiment_dir(experiment_id) / "events.jsonl"
 
 
+# 2026-09-18, real bug found live: PARALLEL_QUESTS>1 runs emit() from
+# multiple threads onto the SAME events.jsonl, and a bare open/write/close
+# with no lock is not guaranteed atomic for a multi-hundred-byte write --
+# a real parallel experiment_0 run produced an interleaved, unparseable
+# line (two threads' writes split mid-record) that crashed the city report
+# downstream. One process-wide lock serializes the actual file write (the
+# JSON encoding above still happens concurrently, only the append is
+# serialized) -- negligible cost even under real parallelism, and exactly
+# zero cost when PARALLEL_QUESTS=1 (uncontended lock acquisition).
+_write_lock = threading.Lock()
+
+
 def emit(
     experiment_id: str,
     task_id: str,
@@ -91,8 +104,10 @@ def emit(
         timestamp=datetime.now(timezone.utc).isoformat(),
         data=data,
     )
-    with open(events_path(experiment_id), "a", encoding="utf-8") as f:
-        f.write(json.dumps(asdict(event)) + "\n")
+    line = json.dumps(asdict(event)) + "\n"
+    with _write_lock:
+        with open(events_path(experiment_id), "a", encoding="utf-8") as f:
+            f.write(line)
     return event
 
 

@@ -1,10 +1,17 @@
 import json
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .. import config
 from ..adapters.base import CompletionResult
+
+# 2026-09-18: same real race condition fixed in events.py's emit() -- a
+# multi-threaded PARALLEL_QUESTS run appends to the same log.jsonl file
+# from several threads at once, and an unguarded open/write/close is not
+# guaranteed atomic. One process-wide lock serializes the actual write.
+_write_lock = threading.Lock()
 
 
 @dataclass
@@ -43,8 +50,10 @@ def archive(experiment_id: str) -> None:
 
 
 def append(record: LogRecord) -> None:
-    with open(log_path(record.experiment_id), "a", encoding="utf-8") as f:
-        f.write(json.dumps(asdict(record)) + "\n")
+    line = json.dumps(asdict(record)) + "\n"
+    with _write_lock:
+        with open(log_path(record.experiment_id), "a", encoding="utf-8") as f:
+            f.write(line)
 
 
 def new_record(
