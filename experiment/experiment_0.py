@@ -26,7 +26,7 @@ from ..adapters import build_adapter
 from ..adapters.base import QuotaExhaustedError
 from ..city.report import generate as generate_city_report
 from ..domain.task_generator import generate_tasks
-from .experiment_log import archive, read_all
+from .experiment_log import archive, copy_config_records, read_all
 from .quest_runner import run_quest
 
 
@@ -57,6 +57,24 @@ def main():
     expert_adapter = build_adapter("expert")
     small_adapter = build_adapter("small")
 
+    # REUSE_CONFIGS_FROM/REUSE_CONFIGS (opt-in, both unset by default = no
+    # reuse, unchanged behavior) -- 2026-09-18, user-requested: when a new
+    # experiment only changes ONE config (e.g. adding "FD" to test the
+    # Detective annotation), the configs that DON'T depend on what changed
+    # (typically A, and B/C too if only the Librarian-side annotation
+    # varies) don't need to be re-run for real quota -- their result on an
+    # unchanged task catalog is the same fact, not a new measurement.
+    # Explicit and per-config on purpose: this never guesses which configs
+    # are safe to reuse, the caller states it, because that's a judgment
+    # about what actually changed that only the caller can make correctly
+    # ("se ci sono cambiamenti che richiedono di rifarle e' un altro conto").
+    reuse_from = os.getenv("REUSE_CONFIGS_FROM", "").strip()
+    reuse_configs = [c.strip() for c in os.getenv("REUSE_CONFIGS", "").split(",") if c.strip()]
+    if reuse_from and reuse_configs:
+        for cfg_name in reuse_configs:
+            copied = copy_config_records(reuse_from, experiment_id, cfg_name)
+            print(f"[experiment_0] config {cfg_name}: {copied} risultati riusati da {reuse_from!r} (nessuna chiamata reale)")
+
     tasks = generate_tasks(seed=42)
     already_done = {(r["task_id"], r["config_name"]) for r in read_all(experiment_id)}
     print(
@@ -65,18 +83,32 @@ def main():
         + (f", resuming ({len(already_done)} quests already logged)" if already_done else "")
     )
 
-    total_calls = len(tasks) * 4
+    # EXTRA_CONFIGS (opt-in, unset by default = exactly A/B/F/C, unchanged)
+    # -- 2026-09-18, user-requested: a way to try new annotations (Detective,
+    # in the future maybe skill_conflict) as ADDITIONAL configs without ever
+    # touching what A/B/F/C themselves mean, so their historical numbers
+    # stay comparable. Currently only "FD" (F + Detective hint) is wired;
+    # naming a config here that this dict doesn't know about is a plain
+    # KeyError, not a silent no-op.
+    _EXTRA_CONFIG_SPECS = {
+        "FD": (small_adapter, True, False, True),  # Small + Librarian + Detective hint
+    }
+    base_configs = [
+        ("A", expert_adapter, False, False, False),
+        ("B", small_adapter, False, False, False),
+        ("F", small_adapter, True, False, False),
+        ("C", small_adapter, False, True, False),  # Cheater: Small + Solution Bank
+    ]
+    extra_names = [c.strip() for c in os.getenv("EXTRA_CONFIGS", "").split(",") if c.strip()]
+    all_configs = base_configs + [(name, *_EXTRA_CONFIG_SPECS[name]) for name in extra_names]
+
+    total_calls = len(tasks) * len(all_configs)
     done = len(already_done)
 
     quest_specs = [
-        (task, config_name, adapter, use_librarian, use_cheater)
+        (task, config_name, adapter, use_librarian, use_cheater, use_detective)
         for task in tasks
-        for config_name, adapter, use_librarian, use_cheater in (
-            ("A", expert_adapter, False, False),
-            ("B", small_adapter, False, False),
-            ("F", small_adapter, True, False),
-            ("C", small_adapter, False, True),  # Cheater: Small + Solution Bank
-        )
+        for config_name, adapter, use_librarian, use_cheater, use_detective in all_configs
         if (task.task_id, config_name) not in already_done
     ]
 
@@ -95,11 +127,11 @@ def main():
 
     stopped_early = False
     if parallel <= 1:
-        for task, config_name, adapter, use_librarian, use_cheater in quest_specs:
+        for task, config_name, adapter, use_librarian, use_cheater, use_detective in quest_specs:
             if stopped_early:
                 break
             try:
-                run_quest(task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater)
+                run_quest(task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater, use_detective=use_detective)
             except QuotaExhaustedError as e:
                 stopped_early = _report_quota_stop(e, done, total_calls)
                 break
@@ -111,8 +143,8 @@ def main():
         quota_error: list[QuotaExhaustedError] = []
         with ThreadPoolExecutor(max_workers=parallel) as pool:
             futures = {
-                pool.submit(run_quest, task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater): (task, config_name)
-                for task, config_name, adapter, use_librarian, use_cheater in quest_specs
+                pool.submit(run_quest, task, experiment_id, config_name, adapter, use_librarian=use_librarian, use_cheater=use_cheater, use_detective=use_detective): (task, config_name)
+                for task, config_name, adapter, use_librarian, use_cheater, use_detective in quest_specs
             }
             for future in as_completed(futures):
                 task, config_name = futures[future]
@@ -156,7 +188,10 @@ def summarize(experiment_id: str):
         avg_latency = bucket["latency"] / bucket["n"] if bucket["n"] else 0.0
         print(f"{cfg:<8}{split:<10}{bucket['n']:>4}{acc:>10.2%}{bucket['cost']:>12.4f}{avg_latency:>16.1f}")
 
-    for cfg in ("A", "B", "F", "C"):
+    # Iterato sui config REALMENTE presenti nel log, non una tupla fissa --
+    # cosi' una nuova config opt-in (es. "FD") compare qui automaticamente
+    # senza un'altra modifica hardcoded ogni volta che se ne aggiunge una.
+    for cfg in sorted({r["config_name"] for r in records}):
         cfg_records = [r for r in records if r["config_name"] == cfg]
         if not cfg_records:
             continue

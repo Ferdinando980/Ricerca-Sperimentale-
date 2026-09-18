@@ -1,10 +1,12 @@
 from ..adapters.base import ModelAdapter
+from ..adapters.factory import build_adapter
 from ..agents.worker import MAX_OUTPUT_TOKENS, SYSTEM_PROMPT, build_prompt, extract_code
 from ..cheater import solution_bank
 from ..domain.verifier import run_tests
 from ..librarian import librarian
 from ..librarian.context_budget import enforce_budget
 from ..models import SkillPackage, Task
+from ..verification import detective
 from .events import emit
 from .experiment_log import LogRecord, append, new_record
 
@@ -16,7 +18,17 @@ def run_quest(
     adapter: ModelAdapter,
     use_librarian: bool = False,
     use_cheater: bool = False,
+    use_detective: bool = False,
 ) -> LogRecord:
+    """use_detective (2026-09-18, opt-in, default False -- does not change
+    A/B/F/C behavior at all): after Librarian retrieval, if the retrieved
+    book has a multi-case rule, runs detective.investigate_cached (Expert-
+    driven, on-disk cached per (book, task) so repeated validation runs
+    don't re-invoke the Expert for the same pair) and, if it resolves,
+    appends the hypothesis as an explicit hint in the Worker's prompt --
+    same annotation role as skill_conflict.py's COMPOUND note. Deliberately
+    a NEW opt-in config (e.g. "FD"), never mutates what F itself means, so
+    F's own historical numbers stay comparable."""
     npc = f"{config_name}:npc"
     ev = emit(
         experiment_id, task.task_id, config_name, npc, "QUEST_CREATED",
@@ -70,13 +82,32 @@ def run_quest(
                 dropped_book_ids=dropped_book_ids, model=model_id,
             )
 
+        detective_hint = None
+        if use_detective and skill_package.books:
+            detective_adapter = build_adapter("expert")
+            for book in skill_package.books:
+                hyp = detective.investigate_cached(book, task, detective_adapter)
+                if hyp is not None and hyp.status == "RESOLVED":
+                    detective_hint = (
+                        f"For this specific task, the applicable case of the skill's rule is: {hyp.supported_case!r}."
+                        + (f' Evidence: "{hyp.evidence_quote}".' if hyp.evidence_quote else " (determined by ruling out the other cases).")
+                    )
+                    break  # un solo indizio basta -- generico, non legato a un libro specifico
+
         prompt = build_prompt(task, skill_package)
+        if detective_hint:
+            prompt = prompt.replace(
+                "Return the corrected function.",
+                f"Hint for this specific task (from a separate investigation of which case of the skill's "
+                f"rule applies here): {detective_hint}\n\nReturn the corrected function.",
+            )
         prompt_tokens = adapter.count_input_tokens(prompt, system=SYSTEM_PROMPT)
         ev = emit(
             experiment_id, task.task_id, config_name, f"{config_name}:{source}", "RETRIEVAL_RESULT",
             parent_event_id=ev.event_id, reason="route_skill",
             coverage=skill_package.coverage,
             skill_ids=[book.id for book in skill_package.books],
+            detective_hint_used=detective_hint is not None,
             base_prompt_tokens=base_tokens,
             skill_context_tokens=max(0, prompt_tokens - base_tokens),
             # Deterministic tag-overlap / solution-lookup retrieval makes no

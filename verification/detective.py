@@ -51,8 +51,10 @@ completeness` taught the hard way."""
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
+from .. import config
 from ..adapters.base import ModelAdapter
 from ..models import Book, Task
 from .stabilizer import vote_for_result
@@ -243,3 +245,47 @@ def investigate(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 
         supported_case=voted["supported_case"], evidence_quote=voted["evidence_quote"],
         all_verdicts=voted["all_verdicts"], status=voted["status"], by_elimination=voted.get("by_elimination", False),
     )
+
+
+_CACHE_PATH = Path(config.LOG_DIR) / "detective_cache.json"
+
+
+def _load_cache() -> dict:
+    if _CACHE_PATH.exists():
+        try:
+            return json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _save_cache(cache: dict) -> None:
+    _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CACHE_PATH.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def investigate_cached(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 3, force: bool = False) -> DetectiveHypothesis | None:
+    """Same as investigate(), but checks a persistent on-disk cache first
+    (2026-09-18, user-requested): the Expert-driven hypothesis for one
+    (book, task) pair does not depend on which experiment run or which
+    repeated Small-model trial is asking, so repeated validation runs
+    (needed for the statistical power a single pilot run doesn't have)
+    should not re-invoke the Expert every single time -- only the actual
+    measurement (does the hint change the Small model's outcome) needs
+    repeating. Keyed by (book.id, task.task_id): a non-destructively
+    versioned repair naturally gets a new book.id, so a repaired skill's
+    cache entry does NOT stick around stale.
+
+    `force=True` is the explicit "decide to re-run the Expert anyway"
+    escape hatch this caching intentionally keeps available -- e.g. after
+    changing Detective's own prompts, or to check the hypothesis is still
+    stable, rather than trusting a cache forever with no way back."""
+    cache = _load_cache()
+    key = f"{book.id}::{task.task_id}"
+    if not force and key in cache:
+        cached = cache[key]
+        return DetectiveHypothesis(**cached) if cached is not None else None
+    hyp = investigate(book, task, adapter, n_samples=n_samples)
+    cache[key] = asdict(hyp) if hyp is not None else None
+    _save_cache(cache)
+    return hyp

@@ -56,6 +56,33 @@ def append(record: LogRecord) -> None:
             f.write(line)
 
 
+def copy_config_records(source_experiment_id: str, target_experiment_id: str, config_name: str) -> int:
+    """Copies one config's LogRecords from a previous experiment into this
+    one, re-pointed at target_experiment_id -- 2026-09-18, user-requested:
+    Config A (Expert alone) doesn't depend on the Librarian/skills, so on an
+    UNCHANGED task catalog its accuracy carries over exactly, and re-running
+    it for every new experiment that only varies B/F-side configs wastes
+    real Expert quota for no new information. Generic across any config
+    name, not hardcoded to "A" -- whatever is genuinely unaffected by what a
+    new experiment varies can be reused the same way.
+
+    Never overwrites: only adds records for (task_id, config_name) pairs
+    the target doesn't already have, so the existing resume/skip logic in
+    experiment_0.py picks these up naturally as "already done" -- no new
+    skip logic needed, this only pre-seeds the log the resume check reads.
+    Returns the number of records actually copied."""
+    source_records = [r for r in read_all(source_experiment_id) if r["config_name"] == config_name]
+    already = {(r["task_id"], r["config_name"]) for r in read_all(target_experiment_id)}
+    copied = 0
+    for r in source_records:
+        if (r["task_id"], config_name) in already:
+            continue
+        record = LogRecord(**{**r, "experiment_id": target_experiment_id})
+        append(record)
+        copied += 1
+    return copied
+
+
 def new_record(
     experiment_id: str,
     task_id: str,

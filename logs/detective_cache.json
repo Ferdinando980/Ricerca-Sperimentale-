@@ -1,0 +1,8 @@
+{
+  "book_floating_point_equality_v4_v5_v6::floating_point_equality__temperature_reached__variant": null,
+  "book_floating_point_equality_v4_v5_v6::floating_point_equality__average_matches_target__known_example": null,
+  "book_wrong_string_case_comparison_v2_v3::wrong_string_case_comparison__find_matching_tag__known_example": null,
+  "book_wrong_string_case_comparison_v2_v3::wrong_string_case_comparison__is_valid_username__variant": null,
+  "book_wrong_string_case_comparison_v2_v3::wrong_string_case_comparison__count_vowels__variant2": null,
+  "book_wrong_string_case_comparison_v2_v3::wrong_string_case_comparison__is_palindrome__variant2": null
+}
