@@ -75,6 +75,18 @@ _TRAP_SYSTEM_PROMPT = (
     "right, they will be verified by actually running them) -- there must "
     "exist SOME correct fix that does NOT use the method and passes, though "
     "you do not need to provide it.\n\n"
+    "If you are told a previous attempt failed, that failure is itself a "
+    "concrete signal, the same way a careful reviewer treats a failed "
+    "experiment as data rather than repeating it unchanged: an abstractly-"
+    "stated condition (e.g. 'when it is semantically appropriate') is often "
+    "too vague to operationalize into code that provably fails one way or "
+    "the other. When that happens, first RESTATE the condition as a "
+    "concrete, code-observable signal -- something you could check by "
+    "reading the function's source or its inputs/outputs, not a judgment "
+    "call (e.g. turn 'when the boundary is meant to be exclusive' into 'the "
+    "docstring/spec explicitly uses a phrase like up to / at most / fewer "
+    "than, vs. at least / more than / at least as many') -- THEN build the "
+    "buggy/mechanical/test trio around that sharpened, concrete version.\n\n"
     "Return ONLY a single JSON object, no prose, no markdown fences: "
     '{"problem_id": "...", "fn_name": "...", "buggy_source": "...", '
     '"mechanical_fix_source": "...", "test_source": "..."}. All source fields '
@@ -142,31 +154,64 @@ def generate_trap_scenario(book: Book, method: MethodSpec, adapter: ModelAdapter
     the buggy source must fail its own tests, AND the mechanically-applied
     "wrong fix" must ALSO fail them -- that second check is what proves the
     trap is genuine (the method is not just insufficient but actively wrong
-    here), not just a harder bug."""
+    here), not just a harder bug.
+
+    2026-09-18: each failed attempt's SPECIFIC reason is now fed back into
+    the next attempt's prompt instead of being silently discarded (a blind
+    retry with no diagnostic info repeats the same mistake -- this was a
+    real, observed bottleneck: wrong_comparison_operator's automated repair
+    exhausted every attempt here, never learning WHY, see inspector.py's
+    run_repair_loop). Same shape as every other prior_feedback loop in this
+    package: capture the concrete reason, hand it back, let the model react
+    to it instead of guessing cold again."""
+    feedback: str | None = None
     for _ in range(max_attempts):
         prompt = (
             f"Method: {method.method}\nMarker: {method.method_marker!r}\n"
             f"Correct-use condition: {method.condition}\nPattern: {book.pattern_id!r}"
         )
+        if feedback:
+            prompt += f"\n\nPrevious attempt failed: {feedback}"
         completion = adapter.complete(prompt=prompt, system=_TRAP_SYSTEM_PROMPT, max_tokens=4096)
         match = _JSON_RE.search(completion.text)
         if not match:
+            feedback = "your response did not contain a parseable JSON object -- return ONLY the JSON object, no prose, no markdown fences."
             continue
         try:
             data = json.loads(match.group(0))
         except json.JSONDecodeError:
+            feedback = "your JSON object did not parse -- check for unescaped quotes/newlines inside the source-code string fields."
             continue
         required = {"problem_id", "fn_name", "buggy_source", "mechanical_fix_source", "test_source"}
         if not required.issubset(data):
+            feedback = f"your JSON object was missing required field(s): {sorted(required - set(data))}."
             continue
         buggy_source, mechanical_fix_source, test_source = data["buggy_source"], data["mechanical_fix_source"], data["test_source"]
         if not all(isinstance(v, str) and v.strip() for v in (buggy_source, mechanical_fix_source, test_source)):
+            feedback = "one of buggy_source/mechanical_fix_source/test_source was empty or not a string."
             continue
         buggy_result = run_tests(buggy_source, test_source)
         mechanical_result = run_tests(mechanical_fix_source, test_source)
-        if buggy_result.passed or mechanical_result.passed:
-            # O il bug non e' un vero bug, o il "fix meccanico" in realta'
-            # funziona -- la trappola non e' genuina, non misurerebbe nulla.
+        if buggy_result.passed and mechanical_result.passed:
+            feedback = (
+                "both buggy_source and mechanical_fix_source PASSED your own tests -- neither is actually "
+                "buggy. Make the original bug more clearly present, and make sure the mechanical fix's own "
+                "marker use does not accidentally already produce correct behavior."
+            )
+            continue
+        if buggy_result.passed:
+            feedback = (
+                "buggy_source PASSED your own tests -- it needs to be genuinely broken. The bug and the "
+                "trap condition are independent requirements: fix the bug's presence first."
+            )
+            continue
+        if mechanical_result.passed:
+            feedback = (
+                "mechanical_fix_source PASSED your own tests, so it isn't actually the wrong fix here -- "
+                "the trap condition you described is not genuinely violated by this scenario. Restate the "
+                "condition as a concrete, code-observable signal (see the system instructions) and build a "
+                "case where that concrete signal is clearly absent, not just plausibly absent."
+            )
             continue
         task = Task(
             task_id=f"{book.pattern_id}__{data['problem_id']}__methodtrap",

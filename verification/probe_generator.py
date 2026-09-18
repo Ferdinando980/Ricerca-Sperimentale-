@@ -84,13 +84,16 @@ _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 _SPLIT_BY_CATEGORY = {"A": "CATEGORY_A", "B": "CATEGORY_B", "C": "CATEGORY_C"}
 
 
-def _build_probe_prompt(book: Book, category: str, avoid_problem_ids: list[str]) -> str:
+def _build_probe_prompt(book: Book, category: str, avoid_problem_ids: list[str], feedback: str | None = None) -> str:
     avoid = f" Avoid these problem_ids, already used for this skill: {avoid_problem_ids}." if avoid_problem_ids else ""
-    return (
+    prompt = (
         f"Skill procedure text (pattern: {book.pattern_id!r}):\n\n{book.procedure_text}\n\n"
         f"Target category:\n{CATEGORY_DESCRIPTIONS[category]}\n\n"
         f"Write ONE new probe task for this category, matching pattern {book.pattern_id!r}.{avoid}"
     )
+    if feedback:
+        prompt += f"\n\nPrevious attempt failed: {feedback}"
+    return prompt
 
 
 def _parse_generated_task(text: str, book: Book, category: str) -> Task | None:
@@ -132,8 +135,9 @@ def generate_probe(
     running it, not assumed from the model's own claim) -- the same bar a
     human author meets by construction when hand-writing a canary task."""
     avoid = list(avoid_problem_ids or [])
+    feedback: str | None = None
     for _ in range(max_attempts):
-        prompt = _build_probe_prompt(book, category, avoid)
+        prompt = _build_probe_prompt(book, category, avoid, feedback)
         # 4096, not 1024: a smaller cap silently truncated reasoning-model
         # output mid-JSON (the same failure agents/worker.py already
         # documents for this provider class -- gemini-3.7-flash spends
@@ -143,6 +147,10 @@ def generate_probe(
         completion = adapter.complete(prompt=prompt, system=_PROBE_SYSTEM_PROMPT, max_tokens=4096)
         task = _parse_generated_task(completion.text, book, category)
         if task is None:
+            # 2026-09-18: name the concrete parse failure instead of a silent
+            # retry -- same fix as method_trap.py's generate_trap_scenario,
+            # same reasoning (a blind retry with no diagnostic repeats itself).
+            feedback = "your response did not parse into a valid task -- return ONLY JSON with problem_id, fn_name, non-empty buggy_source, and non-empty test_source, no prose, no markdown fences."
             continue
         result = run_tests(task.buggy_source, task.test_source)
         if result.passed:
@@ -151,6 +159,7 @@ def generate_probe(
             # nothing. Not usable; retry with this problem_id excluded so the
             # model doesn't just regenerate the same non-bug.
             avoid.append(task.problem_id)
+            feedback = f"'{task.problem_id}'s buggy_source PASSED its own test_source -- the bug wasn't real. Make the bug more clearly present, or the tests more sensitive to it."
             continue
         return task
     return None

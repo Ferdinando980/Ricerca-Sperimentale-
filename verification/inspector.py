@@ -53,9 +53,31 @@ def judge_repair_result(result: Any) -> InspectorVerdict:
     RepairResult/MethodRepairResult, produced by the real gates in
     skill_repair.py/method_repair.py. The Inspector's only original work is
     naming which gate is responsible and phrasing that as something the
-    repair prompt can act on directly."""
+    repair prompt can act on directly.
+
+    2026-09-18, real bug found via a genuine 4-attempt trajectory on
+    wrong_comparison_operator: attempts 2-4 all failed because the trap-
+    scenario generator downstream could not produce fresh, execution-
+    verified scenarios (or produced only INCONCLUSIVE ones) -- NOT because
+    the candidate text was bad. The loop kept asking for a brand-new
+    rewrite each time anyway, which cannot fix a flaky VERIFIER and wastes
+    an Expert call rewriting something that was never actually judged.
+    `verification_inconclusive=True` on the result (set only at the specific
+    "could not measure anything" return points, never at a real quality
+    gate) now routes this to its own status/responsible pair instead of
+    being folded into an ordinary quality rejection -- see run_repair_loop,
+    which reuses the SAME candidate_text and retries verification only,
+    rather than regenerating."""
     if result.accepted:
         return InspectorVerdict(status="SOLID", reason=result.reason, responsible="", feedback_for_regeneration="")
+
+    if getattr(result, "verification_inconclusive", False):
+        return InspectorVerdict(
+            status="INCONCLUSIVE",
+            reason=result.reason,
+            responsible="verification_infrastructure",
+            feedback_for_regeneration=result.reason,
+        )
 
     if result.holdout_passed is False:
         responsible = "holdout"
@@ -167,13 +189,23 @@ def run_repair_loop(
     forever, and does not silently accept a non-SOLID result either)."""
     verdicts: list[InspectorVerdict] = []
     prior_feedback: str | None = None
+    reuse_candidate_text: str | None = None
     result = None
     for attempt_n in range(1, max_attempts + 1):
-        result = repair_fn(**repair_kwargs, prior_feedback=prior_feedback)
+        result = repair_fn(**repair_kwargs, prior_feedback=prior_feedback, reuse_candidate_text=reuse_candidate_text)
         verdict = judge_repair_result(result)
         verdicts.append(verdict)
         _log_attempt(experiment_id, pattern_id, attempt_n, verdict, result)
         if verdict.status == "SOLID":
             break
-        prior_feedback = verdict.feedback_for_regeneration
+        if verdict.responsible == "verification_infrastructure":
+            # Il candidato non e' mai stato davvero giudicato -- ririprovare
+            # SOLO la verifica sullo stesso testo, non chiederne uno nuovo
+            # (vedi judge_repair_result: rigenerare non risolve un verificatore
+            # instabile, e spreca una chiamata Expert su un rifacimento inutile).
+            reuse_candidate_text = getattr(result, "candidate_text", None)
+            prior_feedback = None
+        else:
+            reuse_candidate_text = None
+            prior_feedback = verdict.feedback_for_regeneration
     return result, verdicts

@@ -92,6 +92,10 @@ class RepairResult:
     holdout_passed: bool | None = None
     saved_path: str | None = None
     content_check_label: str | None = None
+    verification_inconclusive: bool = False  # True when the candidate could NOT be
+    # judged at all (verification infra failed to produce evidence), as opposed to
+    # being judged and found wanting -- see inspector.py's judge_repair_result,
+    # which routes these two cases to different retry strategies.
 
 
 def _build_repair_prompt(book: Book, slot_name: str, ablation: AblationResult, prior_feedback: str | None = None) -> str:
@@ -130,6 +134,7 @@ def repair_skill(
     output_dir: Path | None = None,
     unrelated_tasks: list[Task] | None = None,
     prior_feedback: str | None = None,
+    reuse_candidate_text: str | None = None,
 ) -> RepairResult:
     """`slot_transform`/`variant_labels` must be the SAME ones used to build
     `ablation` in the first place, applied here to the ORIGINAL text again --
@@ -139,15 +144,26 @@ def repair_skill(
     on text that no longer contains it, and the resulting "ablation" just
     measures sampling noise, not substitution risk). Passing the transform
     FUNCTION instead lets this re-derive variants from the CANDIDATE's own
-    text, and detect when the slot is simply gone."""
+    text, and detect when the slot is simply gone.
+
+    `reuse_candidate_text` (2026-09-18): when set, SKIPS the Expert rewrite
+    call and re-runs verification on this exact text instead -- for the
+    Inspector loop to retry a flaky VERIFICATION step (e.g. transient
+    generation failure downstream) without discarding a candidate that was
+    never actually judged and burning another rewrite call for nothing. Only
+    makes sense as a response to a previous `verification_inconclusive=True`
+    result, never to a real quality rejection (see inspector.py)."""
     if ablation.total_checks == 0:
         return RepairResult(accepted=False, reason="ablation originale senza dati (total_checks=0)", original_tracking_ratio=0.0)
 
-    prompt = _build_repair_prompt(book, slot_name, ablation, prior_feedback)
-    completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=2048)
-    candidate_text = completion.text.strip()
-    if not candidate_text:
-        return RepairResult(accepted=False, reason="riscrittura vuota", original_tracking_ratio=ablation.tracking_ratio)
+    if reuse_candidate_text is not None:
+        candidate_text = reuse_candidate_text
+    else:
+        prompt = _build_repair_prompt(book, slot_name, ablation, prior_feedback)
+        completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=2048)
+        candidate_text = completion.text.strip()
+        if not candidate_text:
+            return RepairResult(accepted=False, reason="riscrittura vuota", original_tracking_ratio=ablation.tracking_ratio)
 
     candidate_book = Book(**{**asdict(book), "procedure_text": candidate_text})
     candidate_variants = {label: slot_transform(candidate_text, label) for label in variant_labels}

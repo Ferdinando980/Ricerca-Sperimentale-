@@ -178,30 +178,43 @@ def _parse_scenario_task(data: dict, book: Book, label: str) -> Task | None:
 def generate_contrasting_scenarios(book: Book, rule: RuleSpec, adapter: ModelAdapter, max_attempts: int = 3) -> ContrastingScenarios | None:
     """Self-checked like probe_generator.py's generate_probe: both buggy_sources
     must actually FAIL their own test_source (verified by really running them),
-    retried up to max_attempts, never accepted on the model's own say-so."""
+    retried up to max_attempts, never accepted on the model's own say-so.
+
+    2026-09-18: each failed attempt's specific reason is fed back into the
+    next attempt (same fix as method_trap.py's generate_trap_scenario, same
+    motivating bottleneck -- a blind retry with no diagnostic repeats the
+    same mistake)."""
+    feedback: str | None = None
     for _ in range(max_attempts):
         prompt = (
             f"Rule: {rule.rule}\nPattern: {book.pattern_id!r}\n"
             f"(Do not mention this literal verbatim in either situation: {rule.literal_to_avoid!r})"
         )
+        if feedback:
+            prompt += f"\n\nPrevious attempt failed: {feedback}"
         completion = adapter.complete(prompt=prompt, system=_SCENARIO_SYSTEM_PROMPT, max_tokens=4096)
         match = _JSON_RE.search(completion.text)
         if not match:
+            feedback = "your response did not contain a parseable JSON object -- return ONLY the JSON object, no prose, no markdown fences."
             continue
         try:
             data = json.loads(match.group(0))
         except json.JSONDecodeError:
+            feedback = "your JSON object did not parse -- check for unescaped quotes/newlines inside the source-code string fields."
             continue
         task_a = _parse_scenario_task(data.get("scenario_a") or {}, book, "a")
         task_b = _parse_scenario_task(data.get("scenario_b") or {}, book, "b")
         direction = str(data.get("direction") or "").strip()
         if task_a is None or task_b is None or not direction:
+            feedback = "scenario_a/scenario_b/direction were missing or malformed -- each scenario needs problem_id, fn_name, buggy_source, and test_source, all non-empty."
             continue
         result_a = run_tests(task_a.buggy_source, task_a.test_source)
         result_b = run_tests(task_b.buggy_source, task_b.test_source)
         if result_a.passed or result_b.passed:
             # Una delle due "buggy" versioni passa già i propri test -- non
             # misura nulla, stesso motivo di scarto di probe_generator.py.
+            which = "scenario_a" if result_a.passed else "scenario_b"
+            feedback = f"{which}'s buggy_source PASSED its own test_source -- it needs to be genuinely broken. Make the bug more clearly present."
             continue
         return ContrastingScenarios(task_a=task_a, task_b=task_b, direction=direction)
     return None

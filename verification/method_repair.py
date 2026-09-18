@@ -104,6 +104,10 @@ class MethodRepairResult:
     holdout_passed: bool | None = None
     saved_path: str | None = None
     content_check_label: str | None = None
+    verification_inconclusive: bool = False  # True when the candidate could NOT be
+    # judged at all (verification infra failed to produce evidence), as opposed to
+    # being judged and found wanting -- see inspector.py's judge_repair_result,
+    # which routes these two cases to different retry strategies.
 
 
 def _build_repair_prompt(book: Book, method: MethodSpec, n_mechanical: int, n_scenarios: int, example: MethodTrapResult | None = None, prior_feedback: str | None = None) -> str:
@@ -140,7 +144,16 @@ def repair_method_skill(
     output_dir: Path | None = None,
     example: MethodTrapResult | None = None,
     prior_feedback: str | None = None,
+    reuse_candidate_text: str | None = None,
 ) -> MethodRepairResult:
+    """`reuse_candidate_text` (2026-09-18): when set, skips the Expert
+    rewrite call and re-runs verification on this exact text instead -- see
+    skill_repair.py's own docstring for the same parameter, same rationale:
+    a flaky trap-scenario regeneration (this pattern's real bottleneck, see
+    generate_trap_scenario's own prior_feedback addition) says nothing about
+    whether the CANDIDATE TEXT was good or bad, so retrying verification on
+    the SAME candidate is the right response, not discarding it for a fresh,
+    costlier rewrite that doesn't address the actual failure."""
     original_ratio = _conclusive_ratio(original.n_mechanical, original.n_avoided)
     if original_ratio is None:
         return MethodRepairResult(accepted=False, reason="nessuno scenario conclusivo originale (tutti INCONCLUSIVE)", original_mechanical_ratio=0.0)
@@ -152,11 +165,14 @@ def repair_method_skill(
             original_mechanical_ratio=original_ratio,
         )
 
-    prompt = _build_repair_prompt(book, method, original.n_mechanical, original.n_scenarios, example, prior_feedback)
-    completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=2048)
-    candidate_text = completion.text.strip()
-    if not candidate_text:
-        return MethodRepairResult(accepted=False, reason="riscrittura vuota", original_mechanical_ratio=original_ratio)
+    if reuse_candidate_text is not None:
+        candidate_text = reuse_candidate_text
+    else:
+        prompt = _build_repair_prompt(book, method, original.n_mechanical, original.n_scenarios, example, prior_feedback)
+        completion = repair_adapter.complete(prompt=prompt, system=_REPAIR_SYSTEM_PROMPT, max_tokens=2048)
+        candidate_text = completion.text.strip()
+        if not candidate_text:
+            return MethodRepairResult(accepted=False, reason="riscrittura vuota", original_mechanical_ratio=original_ratio)
 
     candidate_book = Book(**{**asdict(book), "procedure_text": candidate_text})
 
@@ -181,6 +197,7 @@ def repair_method_skill(
         return MethodRepairResult(
             accepted=False, reason="impossibile rigenerare scenari-trappola per la riverifica del candidato",
             original_mechanical_ratio=original_ratio, candidate_text=candidate_text, holdout_passed=True,
+            verification_inconclusive=True,
         )
     candidate_ratio = _conclusive_ratio(candidate_aggregated.n_mechanical, candidate_aggregated.n_avoided)
     if candidate_ratio is None:
@@ -190,6 +207,7 @@ def repair_method_skill(
         return MethodRepairResult(
             accepted=False, reason="riverifica del candidato tutta INCONCLUSIVE -- nessuna evidenza ne' di miglioramento ne' di rischio residuo",
             original_mechanical_ratio=original_ratio, candidate_text=candidate_text, holdout_passed=True,
+            verification_inconclusive=True,
         )
     drop = original_ratio - candidate_ratio
     if drop < _MIN_MECHANICAL_DROP:
