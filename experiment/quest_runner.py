@@ -1,5 +1,4 @@
 from ..adapters.base import ModelAdapter
-from ..adapters.factory import build_adapter
 from ..agents.worker import MAX_OUTPUT_TOKENS, SYSTEM_PROMPT, build_prompt, extract_code
 from ..cheater import solution_bank
 from ..domain.verifier import run_tests
@@ -84,7 +83,19 @@ def run_quest(
 
         detective_hint = None
         if use_detective and skill_package.books:
-            detective_adapter = build_adapter("expert")
+            # Small (adapter), NOT Expert -- 2026-09-18, corrected: the whole
+            # point of this project is a Small-model ecosystem approaching
+            # Expert performance WITHOUT calling Expert at runtime. Expert's
+            # actual job already happened when Detective's own prompts were
+            # authored (the generic index-cases/ask-a-distinguishing-
+            # question/answer-with-evidence method IS "how Claude would do
+            # it", already baked into detective.py's system prompts) --
+            # running a live Expert call here would just smuggle Expert back
+            # into F+Detective's runtime, defeating the comparison against F
+            # the same way the Cheater config exists to catch. Verified
+            # live: Gemma alone correctly resolves both real cases here once
+            # the question-generation bug (see detective.py) was fixed.
+            detective_adapter = adapter
             for book in skill_package.books:
                 hyp = detective.investigate_cached(book, task, detective_adapter)
                 if hyp is not None and hyp.status == "RESOLVED":

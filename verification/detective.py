@@ -93,16 +93,65 @@ _EXTRACT_CASES_SYSTEM_PROMPT = (
     "multi-case rule."
 )
 
-_GENERATE_QUESTION_SYSTEM_PROMPT = (
-    "You are given a procedure's multi-case decision rule and ONE specific "
-    "case from it. Write the single most concrete, specific question whose "
-    "answer -- if you could inspect a NEW, unrelated task -- would tell you "
-    "whether THIS case applies to that task or not. The question must be "
-    "answerable by pointing at concrete text in the task (a stated number, a "
-    "named domain, a specific phrase), not by opinion or by re-reading the "
-    "rule itself.\n\n"
-    'Return ONLY JSON: {"question": "..."}'
+_GENERATE_QUESTIONS_SYSTEM_PROMPT = (
+    "You are given a procedure's multi-case decision rule and its FULL list "
+    "of cases, in order. For EACH case, write the single most concrete, "
+    "specific question whose answer -- if you could inspect a NEW, "
+    "unrelated task -- would tell you whether THIS case applies to that "
+    "task or not. Each question must be answerable by pointing at concrete "
+    "text in the task (a stated number, a named domain, a specific "
+    "phrase), not by opinion or by re-reading the rule itself.\n\n"
+    "CRITICAL: you are shown every case together specifically so each "
+    "question can be made to DISTINGUISH its case from every OTHER case "
+    "listed -- two questions that could both be answered the same way for "
+    "the same task are not doing their job. If two cases are naturally "
+    "close (e.g. 'a specific convention applies' vs 'no convention "
+    "applies'), make each question target what is UNIQUELY true of ITS "
+    "case only.\n\n"
+    "If a case is itself defined as a FALLBACK ('neither/none of the other "
+    "cases applies') -- its truth is an ABSENCE (nothing else applies), "
+    "which cannot be proven by quoting a specific piece of text (you cannot "
+    "quote something that isn't there). For that case ONLY, return null "
+    "instead of a question -- it will correctly be resolved by ruling out "
+    "every other case instead, not by answering a question of its own.\n\n"
+    "Every question MUST be a strict yes/no question, answerable only with "
+    "true or false -- start it with a word like Is/Are/Does/Do/Did/Has/"
+    "Have/Can/Was/Were. NEVER write an open question ('What tolerance is "
+    "given?', 'Which convention applies?') even with a fallback instruction "
+    "attached ('...if none, leave blank') -- that hybrid form is NOT a "
+    "yes/no question and will be rejected. Bad: 'What known domain "
+    "convention applies here? If none, leave blank.' Good: 'Does the task "
+    "explicitly reference a currency, monetary amount, or other named "
+    "domain convention?'\n\n"
+    'Return ONLY JSON: {"questions": ["question for case 1", "question for '
+    'case 2", null, ...]} -- same order and same length as the case list '
+    "given, one entry per case (a real yes/no question, or null only for a "
+    "fallback case as instructed above)."
 )
+
+_YES_NO_START_RE = re.compile(
+    r"^(is|are|does|do|did|has|have|had|can|could|will|would|should|was|were)\b", re.IGNORECASE
+)
+
+
+def _is_yes_no_question(question: str) -> bool:
+    """Mechanical well-formedness check, not a judgment call -- same
+    verbatim-style discipline as everywhere else in this package: a
+    generated 'question' that isn't even grammatically a yes/no question
+    (starts with What/Which, or bolts on 'if none, leave blank') cannot be
+    answered reliably as true/false no matter how good the answering model
+    is. Found live: this exact malformed shape ('What X applies? If none,
+    leave blank.') was one contributing cause of a wrong case resolution
+    on a real catalog task."""
+    q = question.strip()
+    if not q.endswith("?"):
+        return False
+    if _YES_NO_START_RE.match(q) is None:
+        return False
+    lowered = q.lower()
+    if "if none" in lowered or "if not" in lowered or "leave blank" in lowered:
+        return False
+    return True
 
 _ANSWER_QUESTION_SYSTEM_PROMPT = (
     "You are given a specific task (its buggy source code, docstring, and "
@@ -134,18 +183,38 @@ def _extract_cases(book: Book, adapter: ModelAdapter) -> list[str]:
     return [c for c in cases if isinstance(c, str) and c.strip()]
 
 
-def _generate_question(book: Book, case: str, adapter: ModelAdapter) -> str | None:
-    prompt = f"Procedure's decision rule:\n\n{book.procedure_text}\n\nSpecific case: {case!r}"
-    completion = adapter.complete(prompt=prompt, system=_GENERATE_QUESTION_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
+def _generate_questions(book: Book, cases: list[str], adapter: ModelAdapter) -> dict[str, str]:
+    """All cases in ONE call (2026-09-18, real bug found live testing with
+    Gemma: generating one question per case in ISOLATION -- the original
+    design -- let two close cases ('a known convention applies' / 'neither
+    applies') get near-duplicate questions, since neither call could see
+    the other case's wording to differentiate against. Both questions then
+    got answered the same way for every task, and the case could never be
+    resolved (0/3 real trials on real catalog tasks, all INCONCLUSIVE).
+    Showing every case together lets the model deliberately make each
+    question distinguish its case from the others -- the fix is structural
+    (more context, not a smarter model), consistent with every other fix
+    in this package that helps a small model by decomposing/restructuring
+    the task rather than asking it to try harder at the same one."""
+    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(cases))
+    prompt = f"Procedure's decision rule:\n\n{book.procedure_text}\n\nFull list of cases:\n{numbered}"
+    completion = adapter.complete(prompt=prompt, system=_GENERATE_QUESTIONS_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
-        return None
+        return {}
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError:
-        return None
-    question = data.get("question")
-    return question if isinstance(question, str) and question.strip() else None
+        return {}
+    questions = data.get("questions")
+    if not isinstance(questions, list) or len(questions) != len(cases):
+        return {}
+    # Filtro meccanico (2026-09-18): una domanda mal formata (aperta, o
+    # ibrida con un "if none, leave blank") non e' recuperabile -- scartarla
+    # equivale a trattare quel caso come senza domanda, risolvibile solo per
+    # esclusione, non a rischiare una risposta su qualcosa che non e'
+    # davvero un sì/no.
+    return {case: q for case, q in zip(cases, questions) if isinstance(q, str) and q.strip() and _is_yes_no_question(q)}
 
 
 def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> dict:
@@ -160,7 +229,12 @@ def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> dict:
     -- inferring a fallback case by elimination (see _investigate_once) is
     only sound when every OTHER case was actually ruled out, not when we
     simply failed to get a clean answer for one of them."""
-    prompt = f"Task:\n\n{_task_text(task)}\n\nQuestion: {question}"
+    # Delimitatore esplicito (2026-09-18) tra il testo del task (dati da cui
+    # citare) e la domanda (istruzione) -- prima erano separati solo da
+    # un'etichetta in prosa ("Task:\n\n..."), un confine debole per un
+    # modello piccolo. I tripli backtick rendono il confine strutturale, non
+    # solo testuale.
+    prompt = f"Task:\n```\n{_task_text(task)}\n```\n\nQuestion: {question}"
     completion = adapter.complete(prompt=prompt, system=_ANSWER_QUESTION_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
@@ -177,11 +251,49 @@ def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> dict:
     quote = data.get("evidence_quote")
     if not isinstance(quote, str) or not quote.strip():
         return {"verdict": "UNKNOWN", "quote": None}
-    if quote not in _task_text(task):
+    task_text = _task_text(task)
+    if quote not in task_text:
         # Citazione allucinata -- non recuperabile, stesso principio
         # verbatim di ogni altro identify_*/extract_* in questo package.
         return {"verdict": "UNKNOWN", "quote": None}
+    # Verifica di pertinenza (2026-09-18, bug reale trovato dal vivo): una
+    # citazione VERA (appare per davvero nel testo) non e' la stessa cosa di
+    # una citazione PERTINENTE alla domanda -- trovato dal vivo un caso dove
+    # Gemma ha citato la riga del confronto stesso ('return sum(nums) /
+    # len(nums) == target') come "prova" di una convenzione di dominio, che
+    # quella riga non menziona affatto. Non e' lo stesso controllo di
+    # survives_adversarial_check (quello cerca una citazione che CONTRADDICE
+    # la conclusione, cosa impossibile qui perche' l'assenza non si cita) --
+    # questo chiede direttamente, a un secondo giudizio indipendente, se la
+    # citazione sostiene davvero la risposta o esiste solo nel testo.
+    if not _quote_actually_supports(question, quote, adapter):
+        return {"verdict": "UNKNOWN", "quote": None}
     return {"verdict": "YES", "quote": quote}
+
+
+_QUOTE_RELEVANCE_SYSTEM_PROMPT = (
+    "You are given a yes/no question and a quote claimed as evidence for "
+    "answering YES to it. Decide, as a skeptical second reviewer: does this "
+    "EXACT quote, read plainly, actually support a yes answer to the "
+    "question -- or does it merely exist somewhere in the source text "
+    "without genuinely answering the question (e.g. it's a piece of code "
+    "or a generic statement that happens to be quotable, but says nothing "
+    "about what the question actually asks)?\n\n"
+    'Return ONLY JSON: {"quote_is_relevant": true|false}'
+)
+
+
+def _quote_actually_supports(question: str, quote: str, adapter: ModelAdapter) -> bool:
+    prompt = f"Question: {question}\n\nQuote claimed as evidence: {quote!r}"
+    completion = adapter.complete(prompt=prompt, system=_QUOTE_RELEVANCE_SYSTEM_PROMPT, max_tokens=256, thinking_budget=0)
+    match = _JSON_RE.search(completion.text)
+    if not match:
+        return False  # fail closed: risposta illeggibile non conta come pertinenza confermata
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return False
+    return data.get("quote_is_relevant") is True
 
 
 def _investigate_once(book: Book, task: Task, cases: list[str], case_questions: dict[str, str], adapter: ModelAdapter) -> dict:
@@ -226,8 +338,8 @@ def investigate(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 
     cases = _extract_cases(book, adapter)
     if len(cases) < 2:
         return None
-    case_questions = {case: _generate_question(book, case, adapter) for case in cases}
-    if not any(q is not None for q in case_questions.values()):
+    case_questions = _generate_questions(book, cases, adapter)
+    if not case_questions:
         return None
 
     voted = vote_for_result(
@@ -266,20 +378,45 @@ def _save_cache(cache: dict) -> None:
 
 def investigate_cached(book: Book, task: Task, adapter: ModelAdapter, n_samples: int = 3, force: bool = False) -> DetectiveHypothesis | None:
     """Same as investigate(), but checks a persistent on-disk cache first
-    (2026-09-18, user-requested): the Expert-driven hypothesis for one
-    (book, task) pair does not depend on which experiment run or which
-    repeated Small-model trial is asking, so repeated validation runs
-    (needed for the statistical power a single pilot run doesn't have)
-    should not re-invoke the Expert every single time -- only the actual
-    measurement (does the hint change the Small model's outcome) needs
-    repeating. Keyed by (book.id, task.task_id): a non-destructively
+    (2026-09-18, user-requested): the investigating model runs the SAME
+    generic, already-authored procedure (index the cases, ask a
+    distinguishing question per case, answer with verbatim evidence, resolve
+    by elimination if needed) every time for a given (book, task) pair, so
+    the hypothesis doesn't depend on which experiment run or which repeated
+    trial is asking -- repeated validation runs (needed for the statistical
+    power a single pilot run doesn't have) shouldn't redo that work every
+    single time. Keyed by (book.id, task.task_id): a non-destructively
     versioned repair naturally gets a new book.id, so a repaired skill's
     cache entry does NOT stick around stale.
 
-    `force=True` is the explicit "decide to re-run the Expert anyway"
-    escape hatch this caching intentionally keeps available -- e.g. after
-    changing Detective's own prompts, or to check the hypothesis is still
-    stable, rather than trusting a cache forever with no way back."""
+    IMPORTANT (corrected 2026-09-18, user pushback): `adapter` here should
+    be the SAME Small-role model used elsewhere in the pipeline, not Expert
+    -- calling a live Expert at runtime to help Detective would smuggle
+    Expert's capability back into F+Detective, defeating the point of a
+    Small-model system (the same failure mode the Cheater config exists to
+    catch). Expert's real job already happened when this module's own
+    prompts were authored (the generic method itself IS "how Claude would
+    approach it") -- verified live that Gemma alone, with those prompts,
+    correctly resolves real cases once a question-generation bug (two
+    cases getting near-duplicate questions when generated in isolation,
+    see _generate_questions) was fixed.
+
+    `force=True` is the explicit "decide to re-run it anyway" escape hatch
+    this caching intentionally keeps available -- e.g. after changing
+    Detective's own prompts, or to check the hypothesis is still stable,
+    rather than trusting a cache forever with no way back.
+
+    Real bug found live (2026-09-18): a mock-mode infrastructure smoke test
+    (EXPERT_PROVIDER=mock, canned garbage responses) called this through
+    quest_runner.py and silently poisoned the persistent cache with `None`
+    for real task ids, since a mock adapter can never produce a real
+    extraction -- a later REAL run then trusted that cached `None` instead
+    of recomputing, hiding a genuinely present rule. A `mock` provider is
+    never authoritative about anything, so its calls bypass the cache
+    entirely -- neither read nor written -- rather than being trusted or
+    poisoning what real callers see later."""
+    if getattr(adapter, "PROVIDER", None) == "mock":
+        return investigate(book, task, adapter, n_samples=n_samples)
     cache = _load_cache()
     key = f"{book.id}::{task.task_id}"
     if not force and key in cache:
