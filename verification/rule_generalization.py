@@ -53,15 +53,18 @@ _RULE_SYSTEM_PROMPT = (
     "the right value should depend on the SPECIFIC situation, not the fixed "
     "example. State also, explicitly, the ANTI-PATTERN: reusing that exact "
     "example value in a situation where it does not apply.\n\n"
+    "First, in the reasoning field, quote the specific illustrative literal "
+    "(if any) and state what it is an example of, before deciding.\n\n"
     "Return ONLY a single JSON object, no prose, no markdown fences:\n"
-    '- If there is such an example: {"has_rule": true, "rule": "the general '
-    'principle, as a function of situation-specific properties, one or two '
-    'sentences", "literal_to_avoid": "the EXACT example value as it appears '
-    'in the text, verbatim", "anti_pattern": "one sentence naming what reusing '
-    'that literal inappropriately would look like"}\n'
+    '- If there is such an example: {"reasoning": "one or two sentences, '
+    'written first", "has_rule": true, "rule": "the general principle, as a '
+    'function of situation-specific properties, one or two sentences", '
+    '"literal_to_avoid": "the EXACT example value as it appears in the text, '
+    'verbatim", "anti_pattern": "one sentence naming what reusing that '
+    'literal inappropriately would look like"}\n'
     '- If the skill has no such illustrative literal (a discrete structural/'
-    'operator choice, nothing to generalize a rule from): {"has_rule": false, '
-    '"reason": "one sentence"}\n'
+    'operator choice, nothing to generalize a rule from): {"reasoning": "one '
+    'sentence, written first", "has_rule": false, "reason": "one sentence"}\n'
     "literal_to_avoid must be copyable verbatim from the procedure text."
 )
 
@@ -97,8 +100,9 @@ _COMPARE_SYSTEM_PROMPT = (
     "responses actually differ the way the rule predicts (genuine derivation "
     "from each situation), or did they collapse to essentially the same value "
     "or approach despite needing to differ (the rule was not really applied)? "
-    "Reply with EXACTLY two lines: GENERALIZES or DOES_NOT_GENERALIZE alone on "
-    "line 1, one short sentence of reasoning on line 2. No other text."
+    "Reply with EXACTLY two lines, in this order: one short sentence of "
+    "reasoning FIRST on line 1 (name what each response actually did), then "
+    "GENERALIZES or DOES_NOT_GENERALIZE alone on line 2. No other text."
 )
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
@@ -112,7 +116,7 @@ class RuleSpec:
 
 
 def extract_rule(book: Book, adapter: ModelAdapter) -> RuleSpec | None:
-    prompt = f"Procedure text (pattern: {book.pattern_id!r}):\n\n{book.procedure_text}"
+    prompt = f"Procedure text (pattern: {book.pattern_id!r}):\n```\n{book.procedure_text}\n```"
     completion = adapter.complete(prompt=prompt, system=_RULE_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
@@ -266,12 +270,15 @@ def run_rule_generalization_check(
         f"Rule: {rule.rule}\n"
         f"Situation A: {scenarios.task_a.problem_id}\nSituation B: {scenarios.task_b.problem_id}\n"
         f"Expected direction: {scenarios.direction}\n\n"
-        f"Response A:\n{code_a}\n\nResponse B:\n{code_b}"
+        f"Response A:\n```\n{code_a}\n```\n\nResponse B:\n```\n{code_b}\n```"
     )
     judged = judge_adapter.complete(prompt=judge_prompt, system=_COMPARE_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     lines = [l.strip() for l in judged.text.strip().splitlines() if l.strip()]
-    label = lines[0].upper() if lines else ""
-    judge_reason = lines[1] if len(lines) > 1 else ""
+    # Ordine invertito (2026-09-18): reasoning scritto PRIMA sulla riga 1,
+    # l'etichetta finale sulla riga 2 -- stesso principio del campo
+    # "reasoning" nei giudizi JSON, applicato qui al formato a due righe.
+    judge_reason = lines[0] if lines else ""
+    label = lines[1].upper() if len(lines) > 1 else ""
     if label == "GENERALIZES":
         generalizes = True
     elif label == "DOES_NOT_GENERALIZE":

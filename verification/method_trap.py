@@ -50,15 +50,19 @@ _METHOD_SYSTEM_PROMPT = (
     "for a case-normalization method), and the specific condition under which "
     "applying it is correct (so a case where that condition does NOT hold, "
     "despite a similar-looking symptom, can be constructed).\n\n"
+    "First, in the reasoning field, name the method and state whether a "
+    "genuine 'wrong context' case exists for it, before deciding.\n\n"
     "Return ONLY a single JSON object, no prose, no markdown fences:\n"
-    '- If applicable: {"has_condition": true, "method": "one sentence, what '
-    'the procedure prescribes", "method_marker": "a short literal substring '
-    'that would appear verbatim in code applying this method, copied from the '
-    'procedure text if it appears there", "condition": "one sentence: when is '
-    'applying this method actually correct"}\n'
+    '- If applicable: {"reasoning": "one sentence, written first", '
+    '"has_condition": true, "method": "one sentence, what the procedure '
+    'prescribes", "method_marker": "a short literal substring that would '
+    'appear verbatim in code applying this method, copied from the procedure '
+    'text if it appears there", "condition": "one sentence: when is applying '
+    'this method actually correct"}\n'
     '- If the method is universally correct whenever the skill\'s own symptom '
-    'applies (no meaningful "wrong context" case exists): {"has_condition": '
-    'false, "reason": "one sentence"}'
+    'applies (no meaningful "wrong context" case exists): {"reasoning": "one '
+    'sentence, written first", "has_condition": false, "reason": "one '
+    'sentence"}'
 )
 
 _TRAP_SYSTEM_PROMPT = (
@@ -104,7 +108,7 @@ class MethodSpec:
 
 
 def extract_method(book: Book, adapter: ModelAdapter) -> MethodSpec | None:
-    prompt = f"Procedure text (pattern: {book.pattern_id!r}):\n\n{book.procedure_text}"
+    prompt = f"Procedure text (pattern: {book.pattern_id!r}):\n```\n{book.procedure_text}\n```"
     completion = adapter.complete(prompt=prompt, system=_METHOD_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:

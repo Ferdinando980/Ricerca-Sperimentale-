@@ -50,8 +50,11 @@ _COUNTER_EVIDENCE_SYSTEM_PROMPT = (
     "STRONGEST evidence IN THE SAME TEXT that would argue AGAINST it. Quote it "
     "verbatim, character for character, ONLY if such evidence genuinely exists "
     "in the text -- do not paraphrase, do not invent something plausible-"
-    "sounding. If you honestly cannot find any real counter-evidence, say so. "
-    'Return ONLY JSON: {"counter_evidence": "exact quote" or null}.'
+    "sounding. If you honestly cannot find any real counter-evidence, say so.\n\n"
+    "First, in the reasoning field, describe what you looked for and where, "
+    "before deciding whether you found real counter-evidence.\n\n"
+    'Return ONLY JSON: {"reasoning": "one sentence, written first", '
+    '"counter_evidence": "exact quote" or null}.'
 )
 
 
@@ -61,10 +64,13 @@ _CONTENT_PRESERVATION_SYSTEM_PROMPT = (
     "diagnostic detail, or fact that was present in the original? Shortening, "
     "rewording, reordering, and even adding NEW material are all fine and do "
     "not count as a problem -- only silently dropping something that was "
-    "there is. Answer on the first line with exactly one word: PRESERVED (all "
-    "original content is present, in any form) or LOST_CONTENT (something "
-    "from the original is missing). On the next line, name the specific "
-    "step/detail that is missing (or 'none' if PRESERVED)."
+    "there is.\n\n"
+    "Reply with EXACTLY two lines, in this order: on line 1, name the "
+    "specific step/detail (if any) that is missing from the rewrite, or "
+    "'none' if nothing is missing -- written first, before you commit to a "
+    "label. On line 2, exactly one word: PRESERVED (all original content is "
+    "present, in any form) or LOST_CONTENT (something from the original is "
+    "missing)."
 )
 
 
@@ -87,12 +93,21 @@ def check_content_preserved(original_text: str, rewritten_text: str, adapter: Mo
     unmodified, already catches it before considering a stricter variant.
 
     `UNPARSEABLE` is a real, distinct outcome, never coerced into PRESERVED or
-    LOST_CONTENT -- callers must treat it as fail-closed (do not accept)."""
-    prompt = f"Original procedure:\n{original_text.strip()}\n\nCompressed rewrite:\n{rewritten_text.strip()}"
-    result = adapter.complete(prompt=prompt, system=_CONTENT_PRESERVATION_SYSTEM_PROMPT, max_tokens=200, thinking_budget=0)
+    LOST_CONTENT -- callers must treat it as fail-closed (do not accept).
+
+    2026-09-18 (user-requested, applied project-wide despite this function's
+    own earlier "kept byte-for-byte identical" note): added a delimiter
+    around the embedded text and swapped the two reply lines so the missing-
+    detail reasoning is written BEFORE the final label, not after -- see
+    template-instructions.md. This changes the prompt's wording/shape,
+    unlike every prior edit to this function; re-validate against
+    optimizer.py's own historical compression results before trusting this
+    exact wording as much as the untouched original was trusted."""
+    prompt = f"Original procedure:\n```\n{original_text.strip()}\n```\n\nCompressed rewrite:\n```\n{rewritten_text.strip()}\n```"
+    result = adapter.complete(prompt=prompt, system=_CONTENT_PRESERVATION_SYSTEM_PROMPT, max_tokens=300, thinking_budget=0)
     lines = [l.strip() for l in result.text.strip().splitlines() if l.strip()]
-    label = lines[0].upper() if lines else ""
-    reasoning = lines[1] if len(lines) > 1 else ""
+    reasoning = lines[0] if lines else ""
+    label = lines[1].upper() if len(lines) > 1 else ""
     if label not in {"PRESERVED", "LOST_CONTENT"}:
         reasoning = f"[unparseable label {label!r}] {result.text.strip()}"
         label = "UNPARSEABLE"
@@ -106,12 +121,13 @@ _CONCRETENESS_PRESERVATION_SYSTEM_PROMPT = (
     "abstraction or an instruction to 'derive the right one' -- even if the "
     "general step is still gestured at? Shortening, rewording, reordering, "
     "and adding NEW concrete material are all fine. Only making something "
-    "LESS concrete/actionable than it was counts as a problem. Answer on the "
-    "first line with exactly one word: PRESERVED (everything that was "
-    "concrete in the original is still just as concrete) or LOST_CONCRETENESS "
-    "(something concrete was replaced by a vaguer abstraction). On the next "
-    "line, name the specific detail that was made vaguer (or 'none' if "
-    "PRESERVED)."
+    "LESS concrete/actionable than it was counts as a problem.\n\n"
+    "Reply with EXACTLY two lines, in this order: on line 1, name the "
+    "specific detail (if any) that was made vaguer, or 'none' if nothing "
+    "was -- written first, before you commit to a label. On line 2, exactly "
+    "one word: PRESERVED (everything that was concrete in the original is "
+    "still just as concrete) or LOST_CONCRETENESS (something concrete was "
+    "replaced by a vaguer abstraction)."
 )
 
 
@@ -131,11 +147,11 @@ def check_concreteness_preserved(original_text: str, rewritten_text: str, adapte
     depends on the original's specific tolerance for legitimate
     generalization during compression, which this stricter check would very
     likely reject more often than intended."""
-    prompt = f"Original procedure:\n{original_text.strip()}\n\nRewrite:\n{rewritten_text.strip()}"
-    result = adapter.complete(prompt=prompt, system=_CONCRETENESS_PRESERVATION_SYSTEM_PROMPT, max_tokens=200, thinking_budget=0)
+    prompt = f"Original procedure:\n```\n{original_text.strip()}\n```\n\nRewrite:\n```\n{rewritten_text.strip()}\n```"
+    result = adapter.complete(prompt=prompt, system=_CONCRETENESS_PRESERVATION_SYSTEM_PROMPT, max_tokens=300, thinking_budget=0)
     lines = [l.strip() for l in result.text.strip().splitlines() if l.strip()]
-    label = lines[0].upper() if lines else ""
-    reasoning = lines[1] if len(lines) > 1 else ""
+    reasoning = lines[0] if lines else ""
+    label = lines[1].upper() if len(lines) > 1 else ""
     if label not in {"PRESERVED", "LOST_CONCRETENESS"}:
         reasoning = f"[unparseable label {label!r}] {result.text.strip()}"
         label = "UNPARSEABLE"
@@ -187,7 +203,7 @@ def survives_adversarial_check(text: str, subject: str, claim_summary: str, adap
     response fails OPEN (True) rather than silently rejecting every candidate
     on a parsing hiccup -- this is a stabilizer, not a new veto with its own
     failure mode to debug."""
-    prompt = f"Text:\n\n{text}\n\nSpecific detail: {subject!r}\nYour classification: {claim_summary}"
+    prompt = f"Text:\n```\n{text}\n```\n\nSpecific detail: {subject!r}\nYour classification: {claim_summary}"
     completion = adapter.complete(prompt=prompt, system=_COUNTER_EVIDENCE_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:

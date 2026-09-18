@@ -82,20 +82,21 @@ _SIMILARITY_SYSTEM_PROMPT = (
     "RELATED -- different bug pattern but real shared conceptual ground "
     "(e.g. same broader domain, or a common root cause).\n"
     "DISTINCT -- unrelated.\n"
-    "Reply with EXACTLY two lines: the label alone on line 1, one short "
-    "sentence of reasoning on line 2. No other text, no preamble."
+    "Reply with EXACTLY two lines, in this order: one short sentence of "
+    "reasoning FIRST on line 1 (what the two books actually say), then the "
+    "label alone on line 2. No other text, no preamble."
 )
 
 
 def classify_pair(book_a, book_b, adapter) -> dict:
     prompt = (
-        f"Book A -- \"{book_a.title}\" (pattern: {book_a.pattern_id}):\n{book_a.procedure_text.strip()}\n\n"
-        f"Book B -- \"{book_b.title}\" (pattern: {book_b.pattern_id}):\n{book_b.procedure_text.strip()}"
+        f"Book A -- \"{book_a.title}\" (pattern: {book_a.pattern_id}):\n```\n{book_a.procedure_text.strip()}\n```\n\n"
+        f"Book B -- \"{book_b.title}\" (pattern: {book_b.pattern_id}):\n```\n{book_b.procedure_text.strip()}\n```"
     )
-    result = adapter.complete(prompt=prompt, system=_SIMILARITY_SYSTEM_PROMPT, max_tokens=200, thinking_budget=0)
+    result = adapter.complete(prompt=prompt, system=_SIMILARITY_SYSTEM_PROMPT, max_tokens=300, thinking_budget=0)
     lines = [l.strip() for l in result.text.strip().splitlines() if l.strip()]
-    label = lines[0].upper() if lines else ""
-    reasoning = lines[1] if len(lines) > 1 else ""
+    reasoning = lines[0] if lines else ""
+    label = lines[1].upper() if len(lines) > 1 else ""
     if label not in VALID_LABELS:
         reasoning = f"[unparseable label {label!r}] {result.text.strip()}"
         label = "UNPARSEABLE"

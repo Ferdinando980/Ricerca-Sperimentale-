@@ -54,15 +54,17 @@ _IDENTIFY_SYSTEM_PROMPT = (
     "task -- this is a known failure mode (mechanical substitution). Others "
     "describe a discrete choice (which operator, which structural fix) with "
     "no such literal to copy at all. Decide which this is.\n\n"
+    "First, in the reasoning field, state which of the two kinds of "
+    "procedure this is and why, before deciding.\n\n"
     "Return ONLY a single JSON object, no prose, no markdown fences:\n"
-    '- If there IS such a literal: {"has_slot": true, "slot_name": "short '
-    'label", "original_value": "the EXACT literal substring as it appears in '
-    'the text, character for character, copyable verbatim", "context_hint": '
-    '"what this value represents and where it appears, one sentence", '
-    '"alt_values": ["plausible alternative value 1", "plausible alternative '
-    'value 2"]}\n'
-    '- If there is no such literal: {"has_slot": false, "reason": "one '
-    'sentence"}\n'
+    '- If there IS such a literal: {"reasoning": "one sentence, written '
+    'first", "has_slot": true, "slot_name": "short label", "original_value": '
+    '"the EXACT literal substring as it appears in the text, character for '
+    'character, copyable verbatim", "context_hint": "what this value '
+    'represents and where it appears, one sentence", "alt_values": '
+    '["plausible alternative value 1", "plausible alternative value 2"]}\n'
+    '- If there is no such literal: {"reasoning": "one sentence, written '
+    'first", "has_slot": false, "reason": "one sentence"}\n'
     "original_value must be copyable verbatim from the procedure text -- do "
     "not paraphrase, reformat, or round it."
 )
@@ -74,9 +76,14 @@ _MATCH_SYSTEM_PROMPT = (
     "SAME number in different notation (e.g. 1e-9 and 0.000000001, or 3.3e-4 "
     "and 0.00033) count as a match -- do not be fooled by formatting. A "
     "genuinely different number, or a value derived without matching any "
-    "candidate, does not match. Return ONLY a single JSON object, no prose, "
-    "no markdown fences: {\"matched_index\": N} where N is the 0-based index "
-    "of the matching candidate, or {\"matched_index\": null} if none match."
+    "candidate, does not match.\n\n"
+    "First, in the reasoning field, quote the specific part of the code "
+    "that computes or uses the value in question, before deciding which "
+    "candidate (if any) it matches.\n\n"
+    "Return ONLY a single JSON object, no prose, no markdown fences: "
+    '{"reasoning": "one sentence, written first", "matched_index": N} where '
+    'N is the 0-based index of the matching candidate, or {"reasoning": '
+    '"...", "matched_index": null} if none match.'
 )
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
@@ -108,7 +115,7 @@ def identify_slot(text: str, source_label: str, adapter: ModelAdapter) -> SlotCa
     return value alone by design (both mean "no ablation-testable slot found
     here"); the reason is only for a human reading logs, printed by the
     caller."""
-    prompt = f"Procedure/instruction text ({source_label!r}):\n\n{text}"
+    prompt = f"Procedure/instruction text ({source_label!r}):\n```\n{text}\n```"
     completion = adapter.complete(prompt=prompt, system=_IDENTIFY_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
@@ -156,7 +163,8 @@ _EXTRACT_LITERALS_SYSTEM_PROMPT = (
     "variable in it.\n\n"
     "Return ONLY a JSON array of exact substrings, copied verbatim "
     'character-for-character from the text, e.g. ["1e-9", "casefold()"]. '
-    "Empty array [] if none."
+    "Empty array [] if none. (This is a mechanical listing task -- no "
+    "reasoning field needed, just the list.)"
 )
 
 _CLASSIFY_LITERAL_SYSTEM_PROMPT = (
@@ -172,10 +180,15 @@ _CLASSIFY_LITERAL_SYSTEM_PROMPT = (
     "exact value grammatically)? (true/false)\n"
     "Only if BOTH are true, also suggest: a short slot_name, a one-sentence "
     "context_hint (what this value represents), and 2 plausible alt_values of "
-    "the same kind. Return ONLY JSON: {\"presented_as_definitive\": true|false, "
-    '"substitutable": true|false, "slot_name": "...", "context_hint": "...", '
-    '"alt_values": ["...", "..."]} (slot_name/context_hint/alt_values omitted '
-    "or empty when either answer is false)."
+    "the same kind.\n\n"
+    "First, in the reasoning field, quote the specific sentence around this "
+    "literal and state plainly what it says about the two questions above, "
+    "before answering them.\n\n"
+    'Return ONLY JSON: {"reasoning": "one or two sentences, written first", '
+    '"presented_as_definitive": true|false, "substitutable": true|false, '
+    '"slot_name": "...", "context_hint": "...", "alt_values": ["...", "..."]} '
+    "(slot_name/context_hint/alt_values omitted or empty when either answer "
+    "is false)."
 )
 
 
@@ -194,7 +207,7 @@ def identify_slot_decomposed(text: str, source_label: str, adapter: ModelAdapter
     identify_slot as the default: re-run validate_slot_identifier_milestone.py
     (or an equivalent repeated-run stability check) against this function
     before trusting it more than the one it replaces."""
-    extract_prompt = f"Procedure/instruction text ({source_label!r}):\n\n{text}"
+    extract_prompt = f"Procedure/instruction text ({source_label!r}):\n```\n{text}\n```"
     extract_completion = adapter.complete(prompt=extract_prompt, system=_EXTRACT_LITERALS_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
     match = re.search(r"\[.*\]", extract_completion.text, re.DOTALL)
     if not match:
@@ -210,7 +223,7 @@ def identify_slot_decomposed(text: str, source_label: str, adapter: ModelAdapter
     candidates = [c for c in candidates if isinstance(c, str) and c.strip() and c in text][:max_candidates]
 
     for candidate in candidates:
-        classify_prompt = f"Procedure/instruction text:\n\n{text}\n\nSpecific literal to evaluate: {candidate!r}"
+        classify_prompt = f"Procedure/instruction text:\n```\n{text}\n```\n\nSpecific literal to evaluate: {candidate!r}"
         completion = adapter.complete(prompt=classify_prompt, system=_CLASSIFY_LITERAL_SYSTEM_PROMPT, max_tokens=1024, thinking_budget=0)
         match = _JSON_RE.search(completion.text)
         if not match:
@@ -297,7 +310,7 @@ def make_extractor(slot: SlotCandidate, adapter: ModelAdapter) -> ValueExtractor
         prompt = (
             f"What to look for: {slot.context_hint or slot.slot_name}\n"
             f"Candidates:\n{candidate_list}\n\n"
-            f"Code:\n{code}"
+            f"Code:\n```\n{code}\n```"
         )
         # 1024, non un valore piccolo come 64: stesso bug reale gia' documen-
         # tato altrove nel progetto (agents/worker.py, probe_generator.py) --

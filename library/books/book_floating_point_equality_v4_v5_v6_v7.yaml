@@ -1,0 +1,68 @@
+id: book_floating_point_equality_v4_v5_v6_v7
+version: 7
+title: Finding floating-point equality bugs (compressed) (compressed) (substitution-repaired)
+  (rule-repaired)
+domain: programming
+problem_tags:
+- wrong-boolean-output
+- flaky-numeric-comparison
+capability_tags:
+- floating-point
+- equality-check
+resource_tags:
+- python
+pattern_id: floating_point_equality
+canonical_problem_id: average_matches_target
+status: VERIFIED
+confidence: 1.0
+verification_count: 5
+verification_types:
+- external
+- manual_fix_2026-08-18
+- self_compression_reverify
+- self_compression_reverify
+- manual_fix_2026-08-18-epsilon-guidance
+- manual_fix_2026-08-18-relative-epsilon-default
+- reverted_2026-08-18-relative-epsilon-attempt-failed
+- rewrite_2026-08-18-explicit-fallback-tiers
+- causal_ablation_2026-08-19
+- substitution_repair_reverify
+- rule_repair_reverify
+procedure_text: "Symptom: Float comparisons (==, !=, in) fail due to precision.\n\n\
+  1. Replace equality/membership checks with tolerance logic:\n   - Single: abs(a\
+  \ - b) < epsilon\n   - Membership: any(abs(a - b) < epsilon for b in values)\n2.\
+  \ Choosing epsilon -- follow this order, do not skip straight to a guess:\n   a.\
+  \ An explicit tolerance/margin/percentage IS stated in the problem: use exactly\
+  \ that, scaled to the values involved (e.g. \"within 2% of budget b\" means epsilon\
+  \ = 0.02 * abs(b), not a fixed number).\n   b. No explicit tolerance, but a well-known,\
+  \ scale-independent domain convention applies. Currently known: money/currency amounts\
+  \ -- compare to the nearest cent, an ABSOLUTE tolerance of 0.01 in the currency's\
+  \ major unit, regardless of the amount's size (do NOT scale this by magnitude --\
+  \ a 10 unit invoice and a 10000 unit invoice both need cent precision, not a percentage\
+  \ of the total).\n   c. Neither (a) nor (b) applies, but the compared values are\
+  \ themselves a MEASUREMENT (e.g. a sensor reading, a physical quantity like temperature/distance/weight)\
+  \ whose own written precision implies a tolerance. Observable signal: the values\
+  \ are written with a specific number of decimal places, and that decimal count is\
+  \ not itself the answer being computed (i.e. it reflects real measurement precision,\
+  \ not an arbitrary literal). Direct mapping: take the SMALLER number of decimal\
+  \ places among the values being compared (call it d), and use epsilon = 0.5 * 10^-d\
+  \ (half of the smallest reported digit's place value -- e.g. comparing 100.0 (1\
+  \ decimal place) to 100.005 (3 decimal places): d = 1, epsilon = 0.05).\n   d. Neither\
+  \ (a), (b), nor (c) applies (no explicit tolerance, no known convention, and the\
+  \ values carry no implied measurement precision -- e.g. abstract numeric computation\
+  \ with no physical/domain meaning): do not invent a tolerance -- there is no reliable\
+  \ way to derive one from nothing, and a confident-looking number here is no more\
+  \ trustworthy than any other guess. Default to a machine-precision epsilon calculated\
+  \ from the float representation used in the context (the standard machine epsilon\
+  \ for the data type, scaled by the magnitude of the inputs) rather than a real-world-scale\
+  \ guess, and add a one-line code comment stating this is a strict default because\
+  \ no tolerance, convention, or measurement precision was stated -- so a human reviewing\
+  \ the diff can widen it if they know better, instead of silently trusting an unverified\
+  \ number.\n3. Use any() over min()/max() to safely handle empty sequences.\n4. On\
+  \ failure: if a true case is wrongly rejected and you used (a) or (b), recheck the\
+  \ scaling/convention before touching anything else; if you used (c), recheck which\
+  \ value's decimal count you took as d; if you used (d), that failure itself is evidence\
+  \ a convention or measurement precision DOES exist for this domain -- state what\
+  \ you now believe it is, do not just widen the number."
+derived_from: book_floating_point_equality_v4_v5_v6
+generation_method: rule_repair

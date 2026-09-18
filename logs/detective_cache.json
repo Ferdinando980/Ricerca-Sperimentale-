@@ -20,5 +20,27 @@
     },
     "status": "RESOLVED",
     "by_elimination": true
+  },
+  "book_floating_point_equality_v4_v5_v6::floating_point_equality__average_matches_target__known_example": {
+    "book_id": "book_floating_point_equality_v4_v5_v6",
+    "task_id": "floating_point_equality__average_matches_target__known_example",
+    "cases": [
+      "an explicit tolerance is stated in the problem",
+      "a known domain convention applies",
+      "neither applies"
+    ],
+    "case_questions": {
+      "an explicit tolerance is stated in the problem": "Is there an exact percentage or margin specified for this comparison?",
+      "a known domain convention applies": "Does the task explicitly reference a currency, monetary amount, or other named domain convention?"
+    },
+    "supported_case": "neither applies",
+    "evidence_quote": null,
+    "all_verdicts": {
+      "an explicit tolerance is stated in the problem": null,
+      "a known domain convention applies": null,
+      "neither applies": null
+    },
+    "status": "RESOLVED",
+    "by_elimination": true
   }
 }
