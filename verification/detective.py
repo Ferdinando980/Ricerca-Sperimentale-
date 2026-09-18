@@ -161,8 +161,13 @@ _ANSWER_QUESTION_SYSTEM_PROMPT = (
     "copyable verbatim. If the task's text does not actually say anything "
     "that answers the question, answer no -- do not infer, assume, or guess "
     "from general knowledge of the domain.\n\n"
-    'Return ONLY JSON: {"answer": true|false, "evidence_quote": "exact '
-    'verbatim substring from the task" or null}'
+    "First, in the reasoning field, name the SPECIFIC part of the task's "
+    "text you are looking at and state plainly what it does or does not "
+    "say about the question -- decide your answer only after doing this, "
+    "not before.\n\n"
+    'Return ONLY JSON: {"reasoning": "one or two sentences, written first", '
+    '"answer": true|false, "evidence_quote": "exact verbatim substring '
+    'from the task" or null}'
 )
 
 
@@ -235,7 +240,12 @@ def _answer_question(task: Task, question: str, adapter: ModelAdapter) -> dict:
     # modello piccolo. I tripli backtick rendono il confine strutturale, non
     # solo testuale.
     prompt = f"Task:\n```\n{_task_text(task)}\n```\n\nQuestion: {question}"
-    completion = adapter.complete(prompt=prompt, system=_ANSWER_QUESTION_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
+    # 768, not 512: the "reasoning" field now written before answer/
+    # evidence_quote adds real output length -- same truncation-risk
+    # lesson as everywhere else in this project (raise the cap when the
+    # required output grows, don't let a fixed tokens/reasoning field
+    # collide with a fixed token cap).
+    completion = adapter.complete(prompt=prompt, system=_ANSWER_QUESTION_SYSTEM_PROMPT, max_tokens=768, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
         return {"verdict": "UNKNOWN", "quote": None}
@@ -279,13 +289,18 @@ _QUOTE_RELEVANCE_SYSTEM_PROMPT = (
     "without genuinely answering the question (e.g. it's a piece of code "
     "or a generic statement that happens to be quotable, but says nothing "
     "about what the question actually asks)?\n\n"
-    'Return ONLY JSON: {"quote_is_relevant": true|false}'
+    "First, in the reasoning field, state PLAINLY what the quote literally "
+    "says, in your own words, with no reference to the question -- then "
+    "decide separately whether that plain meaning actually answers the "
+    "question.\n\n"
+    'Return ONLY JSON: {"reasoning": "one sentence, written first", '
+    '"quote_is_relevant": true|false}'
 )
 
 
 def _quote_actually_supports(question: str, quote: str, adapter: ModelAdapter) -> bool:
     prompt = f"Question: {question}\n\nQuote claimed as evidence: {quote!r}"
-    completion = adapter.complete(prompt=prompt, system=_QUOTE_RELEVANCE_SYSTEM_PROMPT, max_tokens=256, thinking_budget=0)
+    completion = adapter.complete(prompt=prompt, system=_QUOTE_RELEVANCE_SYSTEM_PROMPT, max_tokens=512, thinking_budget=0)
     match = _JSON_RE.search(completion.text)
     if not match:
         return False  # fail closed: risposta illeggibile non conta come pertinenza confermata

@@ -8,8 +8,8 @@
       "neither applies"
     ],
     "case_questions": {
-      "an explicit tolerance is stated in the problem": "Is there any text that explicitly states a specific tolerance or margin for comparing floats?",
-      "a known domain convention applies": "Does this task refer to a currency, monetary amount, or other named domain where a standard precision rule is known?"
+      "an explicit tolerance is stated in the problem": "Is there a specific percentage or margin given for how close the values must be?",
+      "a known domain convention applies": "Does the task mention money, currency, or any other financial unit that has a standard precision (like cents)?"
     },
     "supported_case": "neither applies",
     "evidence_quote": null,
@@ -20,28 +20,5 @@
     },
     "status": "RESOLVED",
     "by_elimination": true
-  },
-  "book_floating_point_equality_v4_v5_v6::floating_point_equality__average_matches_target__known_example": {
-    "book_id": "book_floating_point_equality_v4_v5_v6",
-    "task_id": "floating_point_equality__average_matches_target__known_example",
-    "cases": [
-      "an explicit tolerance is stated in the problem",
-      "a known domain convention applies",
-      "neither applies"
-    ],
-    "case_questions": {
-      "an explicit tolerance is stated in the problem": "Is there a specific percentage or margin mentioned in the task that can be used as a tolerance?",
-      "a known domain convention applies": "Does the task explicitly reference a currency, monetary amount, or other named domain convention?",
-      "neither applies": "Do none of the above apply?"
-    },
-    "supported_case": null,
-    "evidence_quote": null,
-    "all_verdicts": {
-      "an explicit tolerance is stated in the problem": null,
-      "a known domain convention applies": null,
-      "neither applies": null
-    },
-    "status": "INCONCLUSIVE",
-    "by_elimination": false
   }
 }
